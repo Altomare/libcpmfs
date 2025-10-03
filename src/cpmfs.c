@@ -201,7 +201,8 @@ static int read_superblock(struct cpm_fs *fs)
 	struct cpm_superblock *sb = &fs->superblock;
 	int ret;
 
-	c = fs->attr.boot_tracks;
+	/* Locate superblock */
+	c = fs->attr.skip_first_cylinders | fs->attr.boot_cylinders;
 	h = 0;
 	s = 1;
 
@@ -232,9 +233,7 @@ static int read_superblock(struct cpm_fs *fs)
 	}
 
 	/* Available disk size for extents */
-	fs->disk_size =
-		fs->attr.sector_size * fs->attr.sector_count * fs->attr.heads;
-	fs->disk_size *= (fs->attr.cylinders - fs->attr.boot_tracks);
+	fs->disk_size = get_disk_size(fs);
 	if (fs->disk_size <= 256 * fs->attr.block_size)
 		fs->block_addressing = CPM_BLOCK_ADDR_8;
 	else
@@ -252,6 +251,10 @@ enum cpm_fs_status cpm_fs_new(struct cpm_fs_attr *attributes,
 	int err = 0;
 
 	if (!sector_cb || !attributes)
+		return CPM_ERR_INVALID_ARG;
+
+	/* Mutually exclusive, only one or none must be set */
+	if (attributes->skip_first_cylinders && attributes->boot_cylinders)
 		return CPM_ERR_INVALID_ARG;
 
 	fs = calloc(sizeof(struct cpm_fs), 1);

@@ -12,9 +12,8 @@ static int check_block_validity(struct cpm_fs *fs, cpm_entry *file)
 {
 	uint32_t max_blocks, dir_blocks;
 
-	/* Maximum block number */
+	/* Maximum block number. disk_size excludes reserved cylinders */
 	max_blocks = fs->disk_size / fs->attr.block_size;
-	/* TODO: this should ignore boot tracks */
 
 	/* Number of blocks reserved for directory table */
 	dir_blocks = (fs->attr.max_dir_entries * 32) / fs->attr.block_size;

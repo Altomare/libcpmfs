@@ -80,6 +80,9 @@ uint32_t extent_nb(cpm_entry *entry);
 /* Returns first entry for pathname. Extension doesn't include status flags */
 int find_file(struct cpm_fs *fs, const char *pathname, int user);
 
+/* Available disk size for files, in bytes */
+uint32_t get_disk_size(struct cpm_fs *fs);
+
 /* Return next extent for file. 0 if none found */
 uint32_t get_next_extent(struct cpm_fs *fs, uint32_t extent);
 
