@@ -70,6 +70,7 @@ ssize_t cpm_fs_read(struct cpm_fs *fs,
 	uint32_t h;
 	uint32_t s;
 	int ret = 0;
+	ssize_t read = 0;
 
 	if (!fs || !file_handle || !buf || !count)
 		return -1;
@@ -108,6 +109,7 @@ ssize_t cpm_fs_read(struct cpm_fs *fs,
 			size_to_read = count;
 
 		memcpy(buf, fs->cache.buf + block_offset, size_to_read);
+		read += size_to_read;
 		count -= size_to_read;
 		file_handle->offset += size_to_read;
 		buf += size_to_read;
@@ -133,7 +135,7 @@ ssize_t cpm_fs_read(struct cpm_fs *fs,
 		}
 	}
 
-	return ret;
+	return read;
 }
 
 void cpm_fs_close(struct cpm_fs *fs, struct cpm_fs_file_handle *file_handle)
