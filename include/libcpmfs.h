@@ -33,8 +33,12 @@ struct cpm_fs_attr {
 
 	/* Filesystem attributes */
 	uint32_t block_size;
-	uint32_t boot_tracks; /* Number of tracks occupied by BIOS/BDOS/CCP */
 	uint32_t max_dir_entries;
+
+	/* Reserved cylinders, mutually exclusive.
+	 * They are still counted in the cylinders field. */
+	uint32_t boot_cylinders; /* On every head */
+	uint32_t skip_first_cylinders; /* On first head */
 };
 
 #define CPM_FS_FLAG_SYSTEM 0x1
@@ -50,7 +54,8 @@ struct cpm_fs_file {
 	uint8_t d_flags;
 };
 
-/* Returns 0 for success */
+/* Returns 0 for success.
+ * Note: cylinder & head numbering start at 0. sector starts at 1. */
 typedef int (*get_sector_cb)(void *userdata,
 			     uint32_t cylinder,
 			     uint32_t head,

@@ -10,6 +10,17 @@ uint32_t extent_nb(cpm_entry *entry)
 	return ((entry->extent_h & 0x3f) << 5) | (entry->extent_l & 0x1f);
 }
 
+uint32_t get_disk_size(struct cpm_fs *fs)
+{
+	uint32_t cylinders;
+
+	cylinders = fs->attr.cylinders * fs->attr.heads;
+	cylinders -= fs->attr.skip_first_cylinders;
+	cylinders -= fs->attr.boot_cylinders * fs->attr.heads;
+
+	return cylinders * fs->attr.sector_size * fs->attr.sector_count;
+}
+
 int find_file(struct cpm_fs *fs, const char *pathname, int user)
 {
 	cpm_entry *entry;
@@ -94,8 +105,12 @@ void block_to_chs(struct cpm_fs *fs,
 	uint32_t temp;
 
 	offset = block * fs->attr.block_size + block_offset;
-	offset += fs->attr.boot_tracks * fs->attr.sector_count *
+
+	/* Ignore reserved cylindres */
+	offset += fs->attr.skip_first_cylinders * fs->attr.sector_count *
 		  fs->attr.sector_size;
+	offset += fs->attr.boot_cylinders * fs->attr.sector_count *
+		  fs->attr.sector_size * fs->attr.heads;
 
 	sector = offset / fs->attr.sector_size;
 	temp = sector % fs->attr.sector_count;
