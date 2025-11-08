@@ -1,6 +1,6 @@
 # libcpmfs
 
-libcpmfs is a simple C library meant to manipulate CP/M filesystems.
+libcpmfs is a simple C library for reading CP/M filesystems.
 It is intended to be used alongside disk manipulation software.
 
 This is not made for data recovery on damaged disks.
@@ -33,8 +33,9 @@ directory and listing files.
 
 ## Limitations
 
-At the moment, only CP/M 2.2 is supported and the library only allows sequential
-file reading.
+At the moment, only CP/M 2.2 is supported.
+
+There is no way to create or modify files.
 
 Tests have been done on little endian machines. It should work on big endian
 machines but hasn't been tested yet.
@@ -42,11 +43,3 @@ machines but hasn't been tested yet.
 ## Licensing
 
 Released under BSD 3-clause license. See `LICENSE`
-
-## To-Do
-
- * OS version for different FS attributes. Only 2.2 is supported now.
- * Debug logs
- * Glossary, and check for inconsistent nomenclature
- * Tests & examples
- * Support seek, write, unlink...
