@@ -195,6 +195,16 @@ void cpm_fs_closedir(struct cpm_fs_dir *dir)
 		free(dir);
 }
 
+static void invert_superblock_endianness(struct cpm_fs *fs)
+{
+	uint16_t tmp;
+	for (uint32_t i = 0; i < fs->superblock.count; ++i) {
+		tmp = fs->superblock.entries[i].block_ptr_w[i];
+		fs->superblock.entries[i].block_ptr_w[i] =
+			((tmp & 0xFF00) >> 8) | ((tmp & 0x00FF) << 8);
+	}
+}
+
 /* Store superblock and parse directory entries */
 static int read_superblock(struct cpm_fs *fs)
 {
@@ -240,6 +250,10 @@ static int read_superblock(struct cpm_fs *fs)
 		fs->block_addressing = CPM_BLOCK_ADDR_8;
 	else
 		fs->block_addressing = CPM_BLOCK_ADDR_16;
+
+	/* CP/M headers use little endian. Adapt if host is big endian. */
+	if (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+		invert_superblock_endianness(fs);
 
 	return 0;
 }

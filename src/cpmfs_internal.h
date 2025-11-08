@@ -32,7 +32,7 @@ typedef struct {
 	uint8_t rc; /* Number of 128 byte records of last extent */
 	union {
 		uint8_t block_ptr[16];
-		uint8_t block_ptr_w[8];
+		uint16_t block_ptr_w[8];
 	};
 } __attribute__((packed, aligned(1))) cpm_entry;
 
