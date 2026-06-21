@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
+
 #define LIBCPMFS_VERSION 0.2
 
 enum cpm_fs_status {
