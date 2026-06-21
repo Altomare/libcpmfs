@@ -28,7 +28,7 @@ static int write_superblock(struct cpm_fs *fs)
 
 		ret = fs->write_sector(fs->userdata, c, h, s, fs->cache);
 		if (ret)
-			return -CPM_ERR_SECTOR_WRITE;
+			return CPM_ERR_SECTOR_WRITE;
 
 		i += j;
 		if (++s > fs->attr.sector_count) {
@@ -40,41 +40,42 @@ static int write_superblock(struct cpm_fs *fs)
 	return CPM_SUCCESS;
 }
 
-int cpm_fs_opendir(struct cpm_fs *fs, struct cpm_fs_dir **out_dir)
+enum cpm_fs_status cpm_fs_opendir(struct cpm_fs *fs,
+				  struct cpm_fs_dir **out_dir)
 {
 	if (!fs || !out_dir)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	*out_dir = (struct cpm_fs_dir *)calloc(sizeof(struct cpm_fs_dir), 1);
 	if (*out_dir == NULL)
-		return -CPM_ERR_NOMEM;
+		return CPM_ERR_NOMEM;
 
 	(*out_dir)->fs = fs;
 	(*out_dir)->current_file_ino = -1;
 	return CPM_SUCCESS;
 }
 
-int cpm_fs_open(struct cpm_fs *fs,
-		const char *pathname,
-		enum cpm_fs_mode mode,
-		int user,
-		struct cpm_fs_file_handle **out_file)
+enum cpm_fs_status cpm_fs_open(struct cpm_fs *fs,
+			       const char *pathname,
+			       enum cpm_fs_mode mode,
+			       int user,
+			       struct cpm_fs_file_handle **out_file)
 {
 	int entry;
 	int ret;
 
 	if (!fs || !pathname || mode < CPM_MODE_RDONLY ||
 	    mode > CPM_MODE_RDWR || !out_file)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	if (!is_valid_user(user))
-		return -CPM_ERR_INVALID_USER;
+		return CPM_ERR_INVALID_USER;
 
 	entry = find_file(fs, pathname, user);
 	if (entry == -1) {
 		if (mode == CPM_MODE_RDONLY)
 			/* File not found, won't create it because read-only */
-			return -CPM_ERR_FILE_NOT_FOUND;
+			return CPM_ERR_FILE_NOT_FOUND;
 		else {
 			ret = create_file(fs, pathname, user);
 			if (ret != CPM_SUCCESS)
@@ -85,14 +86,14 @@ int cpm_fs_open(struct cpm_fs *fs,
 			entry = find_file(fs, pathname, user);
 			if (entry == -1)
 				/* Should never happen */
-				return -CPM_ERR_FILE_NOT_FOUND;
+				return CPM_ERR_FILE_NOT_FOUND;
 		}
 	}
 
 	*out_file = (struct cpm_fs_file_handle *)calloc(
 		sizeof(struct cpm_fs_file_handle), 1);
 	if (*out_file == NULL)
-		return -CPM_ERR_NOMEM;
+		return CPM_ERR_NOMEM;
 
 	(*out_file)->entry = entry;
 	(*out_file)->block = 0;
@@ -102,11 +103,12 @@ int cpm_fs_open(struct cpm_fs *fs,
 	return CPM_SUCCESS;
 }
 
-int cpm_fs_read(struct cpm_fs *fs,
-		struct cpm_fs_file_handle *file_handle,
-		uint8_t *buf,
-		size_t count,
-		size_t *out_read)
+#include <stdio.h>
+enum cpm_fs_status cpm_fs_read(struct cpm_fs *fs,
+			       struct cpm_fs_file_handle *file_handle,
+			       uint8_t *buf,
+			       size_t count,
+			       size_t *out_read)
 {
 	cpm_entry *entry;
 	uint16_t block;
@@ -116,7 +118,7 @@ int cpm_fs_read(struct cpm_fs *fs,
 	int ret = 0;
 
 	if (!fs || !file_handle || !buf || count == 0 || !out_read)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	*out_read = 0;
 	entry = &fs->superblock.entries[file_handle->entry];
@@ -127,8 +129,10 @@ int cpm_fs_read(struct cpm_fs *fs,
 		else
 			block = entry->block_ptr_w[file_handle->block];
 
-		if (!block) /* EOF */
+		if (!block) /* EOF */ {
+			printf("noblock, EOF (read = %ld)\n", *out_read);
 			break;
+		}
 
 		/* Last block size is determined by RC */
 		block_size = fs->attr.block_size;
@@ -139,7 +143,7 @@ int cpm_fs_read(struct cpm_fs *fs,
 		block_to_chs(fs, block, file_handle->offset, &c, &h, &s);
 		ret = fs->read_sector(fs->userdata, c, h, s, fs->cache);
 		if (ret != 0)
-			return -CPM_ERR_SECTOR_READ;
+			return CPM_ERR_SECTOR_READ;
 
 		uint32_t block_offset =
 			file_handle->offset % fs->attr.sector_size;
@@ -199,7 +203,7 @@ static int write_sector(struct cpm_fs *fs,
 	 * beforehand as not to overwrite the data at the start. */
 	if (offset)
 		if (fs->read_sector(fs->userdata, c, h, s, fs->cache) != 0)
-			return -CPM_ERR_SECTOR_READ;
+			return CPM_ERR_SECTOR_READ;
 
 	memcpy(fs->cache + offset, buf, count);
 	ret = fs->write_sector(fs->userdata, c, h, s, fs->cache);
@@ -236,7 +240,7 @@ static ssize_t write_block(struct cpm_fs *fs,
 		}
 
 		if (ret != 0)
-			return -CPM_ERR_SECTOR_WRITE;
+			return CPM_ERR_SECTOR_WRITE;
 
 		written += to_write;
 		buf = (uint8_t *)buf + to_write;
@@ -245,11 +249,11 @@ static ssize_t write_block(struct cpm_fs *fs,
 	return (ssize_t)written;
 }
 
-int cpm_fs_write(struct cpm_fs *fs,
-		 struct cpm_fs_file_handle *file,
-		 uint8_t *buf,
-		 size_t count,
-		 size_t *out_written)
+enum cpm_fs_status cpm_fs_write(struct cpm_fs *fs,
+				struct cpm_fs_file_handle *file,
+				uint8_t *buf,
+				size_t count,
+				size_t *out_written)
 {
 	cpm_entry *entry;
 	uint16_t block;
@@ -257,7 +261,7 @@ int cpm_fs_write(struct cpm_fs *fs,
 	size_t to_write;
 
 	if (!fs || !file || !buf || !fs->write_sector || !out_written)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	if (file->mode & CPM_MODE_RDONLY)
 		return CPM_ERR_FILE_READ_ONLY;
@@ -340,21 +344,22 @@ int cpm_fs_write(struct cpm_fs *fs,
 
 #undef MIN
 
-int cpm_fs_unlink(struct cpm_fs *fs, const char *filename, int user)
+enum cpm_fs_status
+cpm_fs_unlink(struct cpm_fs *fs, const char *filename, int user)
 {
 	int32_t entry_idx;
 	uint8_t header[13];
 	int ret;
 
 	if (!fs || !filename)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	if (!is_valid_user(user))
-		return -CPM_ERR_INVALID_USER;
+		return CPM_ERR_INVALID_USER;
 
 	entry_idx = find_file(fs, filename, user);
 	if (entry_idx == -1)
-		return -CPM_ERR_FILE_NOT_FOUND;
+		return CPM_ERR_FILE_NOT_FOUND;
 
 	/* user + filename + type */
 	memcpy(header, &fs->superblock.entries[entry_idx], 12);
@@ -367,11 +372,11 @@ int cpm_fs_unlink(struct cpm_fs *fs, const char *filename, int user)
 	return ret;
 }
 
-int cpm_fs_rename(struct cpm_fs *fs,
-		  const char *old_path,
-		  int old_user,
-		  const char *new_path,
-		  int new_user)
+enum cpm_fs_status cpm_fs_rename(struct cpm_fs *fs,
+				 const char *old_path,
+				 int old_user,
+				 const char *new_path,
+				 int new_user)
 {
 	uint8_t header[13];
 	char filename[8];
@@ -384,9 +389,9 @@ int cpm_fs_rename(struct cpm_fs *fs,
 	int ret;
 
 	if (!fs || !old_path || !new_path)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 	if (!is_valid_user(old_user) || !is_valid_user(new_user))
-		return -CPM_ERR_INVALID_USER;
+		return CPM_ERR_INVALID_USER;
 
 	memset(filename, 0x20, 8);
 	memset(ext, 0x20, 3);
@@ -394,7 +399,7 @@ int cpm_fs_rename(struct cpm_fs *fs,
 	/* Stop if destination already exists */
 	entry_idx = find_file(fs, new_path, new_user);
 	if (entry_idx != -1)
-		return -CPM_ERR_DESTINATION_EXISTS;
+		return CPM_ERR_DESTINATION_EXISTS;
 
 	/* Validate and separate path */
 	ret = parse_filename(
@@ -408,7 +413,7 @@ int cpm_fs_rename(struct cpm_fs *fs,
 	/* Find origin */
 	entry_idx = find_file(fs, old_path, old_user);
 	if (entry_idx == -1)
-		return -CPM_ERR_FILE_NOT_FOUND;
+		return CPM_ERR_FILE_NOT_FOUND;
 
 	/* Copy flags */
 	for (int i = 0; i < 3; ++i)
@@ -429,25 +434,26 @@ int cpm_fs_rename(struct cpm_fs *fs,
 }
 
 
-int cpm_fs_close(struct cpm_fs *fs, struct cpm_fs_file_handle *file_handle)
+enum cpm_fs_status cpm_fs_close(struct cpm_fs *fs,
+				struct cpm_fs_file_handle *file_handle)
 {
 	if (!fs || !file_handle)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	free(file_handle);
 	return CPM_SUCCESS;
 }
 
-int cpm_fs_readdir(struct cpm_fs *fs,
-		   struct cpm_fs_dir *dirp,
-		   struct cpm_fs_file **out_file)
+enum cpm_fs_status cpm_fs_readdir(struct cpm_fs *fs,
+				  struct cpm_fs_dir *dirp,
+				  struct cpm_fs_file **out_file)
 {
 	cpm_entry *entry;
 	uint8_t *filename_out;
 	int i;
 
 	if (!fs || !dirp || !out_file)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	while ((uint32_t)++dirp->current_file_ino < fs->superblock.count) {
 		/* Iterate until we find a file entry */
@@ -492,21 +498,21 @@ int cpm_fs_readdir(struct cpm_fs *fs,
 	return CPM_SUCCESS;
 }
 
-int cpm_fs_closedir(struct cpm_fs __attribute__((unused)) * fs,
-		    struct cpm_fs_dir *dir)
+enum cpm_fs_status cpm_fs_closedir(struct cpm_fs __attribute__((unused)) * fs,
+				   struct cpm_fs_dir *dir)
 {
 	if (!dir)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 	free(dir);
 	return CPM_SUCCESS;
 }
 
-int cpm_fs_getattr(struct cpm_fs *fs,
-		   struct cpm_fs_file_handle *file,
-		   int *out_attrs)
+enum cpm_fs_status cpm_fs_getattr(struct cpm_fs *fs,
+				  struct cpm_fs_file_handle *file,
+				  int *out_attrs)
 {
 	if (!fs || !file || !out_attrs)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	*out_attrs = 0;
 	cpm_entry *entry = &fs->superblock.entries[file->entry];
@@ -520,12 +526,11 @@ int cpm_fs_getattr(struct cpm_fs *fs,
 	return CPM_SUCCESS;
 }
 
-int cpm_fs_setattr(struct cpm_fs *fs,
-		   struct cpm_fs_file_handle *file,
-		   int attrs)
+enum cpm_fs_status
+cpm_fs_setattr(struct cpm_fs *fs, struct cpm_fs_file_handle *file, int attrs)
 {
 	if (!fs || !file || !attrs)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	for (uint32_t i = 0; i < fs->superblock.count; ++i) {
 		/* Compare user, filename, ext */
@@ -570,13 +575,13 @@ static int read_superblock(struct cpm_fs *fs)
 	sb->count = fs->attr.max_dir_entries;
 	sb->entries = (cpm_entry *)malloc(sizeof(cpm_entry) * sb->count);
 	if (!sb->entries)
-		return -CPM_ERR_NOMEM;
+		return CPM_ERR_NOMEM;
 
 	while ((uint32_t)i < sb->count) {
 		j = 0;
 		ret = fs->read_sector(fs->userdata, c, h, s, fs->cache);
 		if (ret != 0)
-			return -CPM_ERR_SECTOR_READ;
+			return CPM_ERR_SECTOR_READ;
 
 		while (j * sizeof(cpm_entry) < fs->attr.sector_size) {
 			memcpy(&sb->entries[i + j],
@@ -607,25 +612,25 @@ static int read_superblock(struct cpm_fs *fs)
 	return 0;
 }
 
-int cpm_fs_new(struct cpm_fs_attr *attributes,
-	       read_sector_cb get_sector_cb,
-	       write_sector_cb set_sector_cb,
-	       void *userdata,
-	       struct cpm_fs **out)
+enum cpm_fs_status cpm_fs_new(struct cpm_fs_attr *attributes,
+			      read_sector_cb get_sector_cb,
+			      write_sector_cb set_sector_cb,
+			      void *userdata,
+			      struct cpm_fs **out)
 {
 	struct cpm_fs *fs;
 	int err = 0;
 
 	if (!get_sector_cb || !attributes || !out)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	/* Mutually exclusive, only one or none must be set */
 	if (attributes->skip_first_cylinders && attributes->boot_cylinders)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 
 	fs = (struct cpm_fs *)calloc(sizeof(struct cpm_fs), 1);
 	if (!fs)
-		return -CPM_ERR_NOMEM;
+		return CPM_ERR_NOMEM;
 
 	fs->attr = *attributes;
 	fs->read_sector = get_sector_cb;
@@ -655,10 +660,10 @@ error:
 	return err;
 }
 
-int cpm_fs_destroy(struct cpm_fs *fs)
+enum cpm_fs_status cpm_fs_destroy(struct cpm_fs *fs)
 {
 	if (!fs)
-		return -CPM_ERR_INVALID_ARG;
+		return CPM_ERR_INVALID_ARG;
 	free(fs->superblock.entries);
 	free(fs->cache);
 	free(fs->av);

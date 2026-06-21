@@ -105,68 +105,70 @@ struct cpm_fs;
 struct cpm_fs_dir;
 struct cpm_fs_file_handle;
 
-/* Every function returns 0 (CPM_SUCCESS) on success, or negative cpm_fs_status
- * on error. */
+/* Every function returns a cpm_fs_status value.
+ * CPM_SUCCESS (0) on success, other values on error. */
 
 /* File names are case-sensitive. The CCP (command line interface) forces
  * upper case, so almost every file is in uppercase. However, some software
  * (MBASIC for instance) can create and modify lower case filenames. */
 
-int cpm_fs_new(struct cpm_fs_attr *attributes,
-	       read_sector_cb get_sector_cb,
-	       write_sector_cb set_sector_cb,
-	       void *userdata,
-	       struct cpm_fs **out);
-int cpm_fs_destroy(struct cpm_fs *fs);
+enum cpm_fs_status cpm_fs_new(struct cpm_fs_attr *attributes,
+			      read_sector_cb get_sector_cb,
+			      write_sector_cb set_sector_cb,
+			      void *userdata,
+			      struct cpm_fs **out);
+enum cpm_fs_status cpm_fs_destroy(struct cpm_fs *fs);
 
 /* Directory, no name argument needed as there are no subdirectories */
-int cpm_fs_opendir(struct cpm_fs *fs, struct cpm_fs_dir **out_dir);
-int cpm_fs_readdir(struct cpm_fs *fs,
-		   struct cpm_fs_dir *dirp,
-		   struct cpm_fs_file **out_file);
-int cpm_fs_closedir(struct cpm_fs *fs, struct cpm_fs_dir *dir);
+enum cpm_fs_status cpm_fs_opendir(struct cpm_fs *fs,
+				  struct cpm_fs_dir **out_dir);
+enum cpm_fs_status cpm_fs_readdir(struct cpm_fs *fs,
+				  struct cpm_fs_dir *dirp,
+				  struct cpm_fs_file **out_file);
+enum cpm_fs_status cpm_fs_closedir(struct cpm_fs *fs, struct cpm_fs_dir *dir);
 
 /* Open the given file.
  * Opening a file twice at the same time will cause undefined behavior. */
-int cpm_fs_open(struct cpm_fs *fs,
-		const char *pathname,
-		enum cpm_fs_mode mode,
-		int user,
-		struct cpm_fs_file_handle **out_file);
-int cpm_fs_close(struct cpm_fs *fs, struct cpm_fs_file_handle *file);
+enum cpm_fs_status cpm_fs_open(struct cpm_fs *fs,
+			       const char *pathname,
+			       enum cpm_fs_mode mode,
+			       int user,
+			       struct cpm_fs_file_handle **out_file);
+enum cpm_fs_status cpm_fs_close(struct cpm_fs *fs,
+				struct cpm_fs_file_handle *file);
 
 /* Read bytes from opened file into buf.
  * Number of read bytes is written to out_read. */
-int cpm_fs_read(struct cpm_fs *fs,
-		struct cpm_fs_file_handle *file,
-		uint8_t *buf,
-		size_t count,
-		size_t *out_read);
+enum cpm_fs_status cpm_fs_read(struct cpm_fs *fs,
+			       struct cpm_fs_file_handle *file,
+			       uint8_t *buf,
+			       size_t count,
+			       size_t *out_read);
 
-int cpm_fs_write(struct cpm_fs *fs,
-		 struct cpm_fs_file_handle *file,
-		 uint8_t *buf,
-		 size_t count,
-		 size_t *out_written);
+enum cpm_fs_status cpm_fs_write(struct cpm_fs *fs,
+				struct cpm_fs_file_handle *file,
+				uint8_t *buf,
+				size_t count,
+				size_t *out_written);
 
 /* Attributes */
-int cpm_fs_getattr(struct cpm_fs *fs,
-		   struct cpm_fs_file_handle *file,
-		   int *out_attrs);
-int cpm_fs_setattr(struct cpm_fs *fs,
-		   struct cpm_fs_file_handle *file,
-		   int attrs);
+enum cpm_fs_status cpm_fs_getattr(struct cpm_fs *fs,
+				  struct cpm_fs_file_handle *file,
+				  int *out_attrs);
+enum cpm_fs_status
+cpm_fs_setattr(struct cpm_fs *fs, struct cpm_fs_file_handle *file, int attrs);
 
 /* Delete file from disk. The blocks containing the file contents are not wiped
  * but marked available for other files again.. */
-int cpm_fs_unlink(struct cpm_fs *fs, const char *pathname, int user);
+enum cpm_fs_status
+cpm_fs_unlink(struct cpm_fs *fs, const char *pathname, int user);
 
 /* Renaming a currently opened file may cause undefined behavior */
-int cpm_fs_rename(struct cpm_fs *fs,
-		  const char *old_path,
-		  int old_user,
-		  const char *new_path,
-		  int new_user);
+enum cpm_fs_status cpm_fs_rename(struct cpm_fs *fs,
+				 const char *old_path,
+				 int old_user,
+				 const char *new_path,
+				 int new_user);
 
 /* Error code to printable string */
 const char *cpm_fs_status_str(enum cpm_fs_status status);

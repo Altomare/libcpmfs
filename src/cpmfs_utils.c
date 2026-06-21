@@ -41,7 +41,7 @@ int av_build(struct cpm_fs *fs)
 	fs->av = (uint8_t *)calloc(
 		(fs->disk_size / fs->attr.block_size) / 8 + 1, 1);
 	if (!fs->av)
-		return -CPM_ERR_NOMEM;
+		return CPM_ERR_NOMEM;
 
 	/* Mark directory blocks as used */
 	dir_blocks = (fs->attr.max_dir_entries * sizeof(cpm_entry) +
@@ -122,7 +122,7 @@ int32_t find_file(struct cpm_fs *fs, const char *pathname, int user)
 		ext_len = 0;
 	}
 	if (file_len == 0)
-		return -1;
+		return 1;
 
 	for (uint32_t i = 0; i < fs->superblock.count; ++i) {
 		entry = &fs->superblock.entries[i];
@@ -143,7 +143,7 @@ int32_t find_file(struct cpm_fs *fs, const char *pathname, int user)
 }
 
 /* If the filename is valid, return zero and store pointers & lengths.
- * Otherwise, return -1.
+ * Otherwise, return 1.
  * Spaces are not trimmed */
 int parse_filename(const char *pathname,
 		   char **out_file,
@@ -171,10 +171,10 @@ int parse_filename(const char *pathname,
 
 	for (size_t i = 0; i < *out_filelen; ++i)
 		if (!is_allowed_char(file[i]))
-			return -CPM_ERR_FILENAME_INVALID;
+			return CPM_ERR_FILENAME_INVALID;
 	for (size_t i = 0; i < *out_extlen; ++i)
 		if (!is_allowed_char(ext[i]))
-			return -CPM_ERR_FILENAME_INVALID;
+			return CPM_ERR_FILENAME_INVALID;
 
 	*out_file = file;
 	if (*out_extlen)
@@ -196,7 +196,7 @@ static int find_free_entry_idx(struct cpm_fs *fs)
 	for (uint32_t i = 0; i < fs->superblock.count; ++i)
 		if (fs->superblock.entries[i].status == 0xE5)
 			return (int)i;
-	return -1;
+	return 1;
 }
 
 int create_file(struct cpm_fs *fs, const char *pathname, int user)
@@ -209,7 +209,7 @@ int create_file(struct cpm_fs *fs, const char *pathname, int user)
 	char *ext = NULL;
 
 	if (user < 0 || user >= 15)
-		return -CPM_ERR_INVALID_USER;
+		return CPM_ERR_INVALID_USER;
 
 	/* Check if filename is valid */
 	ret = parse_filename(pathname, &file, &file_len, &ext, &ext_len);
@@ -217,11 +217,11 @@ int create_file(struct cpm_fs *fs, const char *pathname, int user)
 		return ret;
 
 	if (find_file(fs, pathname, user) != -1)
-		return -CPM_ERR_FILE_ALREADY_EXISTS;
+		return CPM_ERR_FILE_ALREADY_EXISTS;
 
 	idx = find_free_entry_idx(fs);
 	if (idx < 0)
-		return -CPM_ERR_DISK_FULL;
+		return CPM_ERR_DISK_FULL;
 
 	/* Flags are not set yet */
 	entry = &fs->superblock.entries[idx];
@@ -243,7 +243,7 @@ int alloc_new_extent(struct cpm_fs *fs, cpm_entry *src_entry)
 
 	extent = find_free_entry_idx(fs);
 	if (extent < 0)
-		return -CPM_ERR_DISK_FULL;
+		return CPM_ERR_DISK_FULL;
 
 	new_entry = &fs->superblock.entries[extent];
 	number = get_last_extent(fs, src_entry) + 1;
@@ -366,11 +366,15 @@ uint32_t get_filesize(struct cpm_fs *fs, cpm_entry *entry)
 		used_blocks = get_used_blocks(fs, tmp);
 		/* RC specifies the size of the last extent, a disk entry might
 		 * contain multiple logical extents */
-		if (extent_nb(tmp) == last_extent)
-			size += 0x4000 * (used_blocks / block_per_extent) +
-				128 * tmp->rc;
-		else
+		if (extent_nb(tmp) == last_extent) {
+			/* Size of full logical extents in entry */
+			if (used_blocks > 0)
+				size += 0x4000 *
+					((used_blocks - 1) / block_per_extent);
+			size += 128 * tmp->rc;
+		} else {
 			size += used_blocks * fs->attr.block_size;
+		}
 	}
 	return size;
 }

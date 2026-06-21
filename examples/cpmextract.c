@@ -70,7 +70,7 @@ static void dump_file(struct cpm_fs *fs, struct cpm_fs_file *cpmfile)
 	uint8_t buf[513];
 	size_t read_bytes;
 	int new_f;
-	int status;
+	enum cpm_fs_status status;
 
 	memcpy(new_name, cpmfile->d_name, 16);
 	for (int i = 0; i < 256; ++i) {
@@ -107,9 +107,7 @@ static void dump_file(struct cpm_fs *fs, struct cpm_fs_file *cpmfile)
 		status = cpm_fs_read(fs, f, buf, 512, &read_bytes);
 	}
 	if (status != CPM_SUCCESS)
-		fprintf(stderr,
-			"Read error: %s\n",
-			cpm_fs_status_str((enum cpm_fs_status) - status));
+		fprintf(stderr, "Read error: %s\n", cpm_fs_status_str(status));
 
 	cpm_fs_close(fs, f);
 	close(new_f);
