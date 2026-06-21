@@ -30,11 +30,11 @@ static int check_block_validity(struct cpm_fs *fs, cpm_entry *file)
 			}
 		}
 	} else {
-		uint16_t *blocks = (uint16_t *)file->block_ptr;
 		for (int i = 0; i < 8; ++i) {
-			if (blocks[i] > max_blocks)
+			if (file->block_ptr_w[i] > max_blocks)
 				return CPM_ERR_BLOCK_OVERFLOW;
-			else if (blocks[i] && blocks[i] <= dir_blocks - 1)
+			else if (file->block_ptr_w[i] &&
+				 file->block_ptr_w[i] <= dir_blocks - 1)
 				return CPM_ERR_FILE_DIR_OVERLAP;
 		}
 	}
@@ -53,19 +53,6 @@ static int qsort_comparator_w(const void *a, const void *b)
 	uint16_t f = *((uint16_t *)a);
 	uint16_t s = *((uint16_t *)b);
 	return (f > s ? 1 : (f < s) ? -1 : 0);
-}
-
-static int is_allowed_char(char c)
-{
-	c = c & 0x7f;
-	/* Unallowed characters */
-	if (c == '<' || c == '>' || c == '.' || c == ',' || c == ';' ||
-	    c == ':' || c == '=' || c == '?' || c == '*' || c == '[' ||
-	    c == ']')
-		return 0;
-	else if (c < 0x20)
-		return 0;
-	return 1;
 }
 
 bool cpm_entry_is_valid(const cpm_entry *entry)
@@ -93,7 +80,7 @@ static int check_extent_overlap_wide(struct cpm_fs *fs)
 	uint32_t i;
 	int ret = 0;
 
-	extent_list = calloc(fs->attr.max_dir_entries * 8, 2);
+	extent_list = (uint16_t *)calloc(fs->attr.max_dir_entries * 8, 2);
 	if (!extent_list)
 		return CPM_ERR_NOMEM;
 
@@ -107,7 +94,7 @@ static int check_extent_overlap_wide(struct cpm_fs *fs)
 	qsort(extent_list, fs->attr.max_dir_entries * 8, 2, qsort_comparator_w);
 	for (i = 0; i < fs->attr.max_dir_entries * 8 - 1; ++i)
 		if (extent_list[i] && extent_list[i] == extent_list[i + 1])
-			ret = CPM_ERR_FILE_OVERLAP;
+			ret = -CPM_ERR_FILE_OVERLAP;
 
 	free(extent_list);
 	return ret;
@@ -119,7 +106,7 @@ static int check_extent_overlap(struct cpm_fs *fs)
 	uint32_t i;
 	int ret = 0;
 
-	extent_list = calloc(16 * fs->superblock.count + 1, 1);
+	extent_list = (uint8_t *)calloc(16 * fs->superblock.count + 1, 1);
 	if (!extent_list)
 		return CPM_ERR_NOMEM;
 
@@ -133,13 +120,13 @@ static int check_extent_overlap(struct cpm_fs *fs)
 	qsort(extent_list, fs->superblock.count * 16, 1, qsort_comparator);
 	for (i = 0; i < fs->superblock.count * 16; ++i)
 		if (extent_list[i] && extent_list[i] == extent_list[i + 1])
-			ret = CPM_ERR_FILE_OVERLAP;
+			ret = -CPM_ERR_FILE_OVERLAP;
 
 	free(extent_list);
 	return ret;
 }
 
-enum cpm_fs_status check_superblock(struct cpm_fs *fs)
+int check_superblock(struct cpm_fs *fs)
 {
 	uint32_t i = 0;
 	int ret = 0;

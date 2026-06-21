@@ -1,3 +1,8 @@
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -58,8 +63,62 @@ static int get_sector(void *userdata,
 	return 0;
 }
 
-static int cpmls(const char *file)
+static void dump_file(struct cpm_fs *fs, struct cpm_fs_file *cpmfile)
 {
+	struct cpm_fs_file_handle *f;
+	char new_name[256];
+	uint8_t buf[513];
+	size_t read_bytes;
+	int new_f;
+	int status;
+
+	memcpy(new_name, cpmfile->d_name, 16);
+	for (int i = 0; i < 256; ++i) {
+		if (new_name[i] == '/')
+			new_name[i] = '_';
+		if (new_name[i] == ':')
+			new_name[i] = '.';
+	}
+
+	printf("%d:%s -> %s\n", cpmfile->d_user, cpmfile->d_name, new_name);
+
+	if (access(new_name, F_OK) == 0) {
+		fprintf(stderr, "\t%s already exists.\n", new_name);
+		return;
+	}
+
+	new_f = open(new_name,
+		     O_CREAT | O_RDWR,
+		     S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	if (!new_f) {
+		fprintf(stderr, "\tUnable to open %s.\n", new_name);
+		return;
+	}
+	status = cpm_fs_open(
+		fs, cpmfile->d_name, CPM_MODE_RDONLY, cpmfile->d_user, &f);
+	if (!f) {
+		fprintf(stderr, "\t[CPM] Unable to open %s\n", cpmfile->d_name);
+		return;
+	}
+
+	status = cpm_fs_read(fs, f, buf, 512, &read_bytes);
+	while (status == CPM_SUCCESS && read_bytes > 0) {
+		write(new_f, buf, read_bytes);
+		status = cpm_fs_read(fs, f, buf, 512, &read_bytes);
+	}
+	if (status != CPM_SUCCESS)
+		fprintf(stderr,
+			"Read error: %s\n",
+			cpm_fs_status_str((enum cpm_fs_status) - status));
+
+	cpm_fs_close(fs, f);
+	close(new_f);
+}
+
+
+static int list_and_dump(const char *file)
+{
+	struct cpm_fs_file *cpmfile;
 	struct cpm_fs_dir *dirp;
 	disk_image img;
 	struct cpm_fs *fs;
@@ -76,24 +135,20 @@ static int cpmls(const char *file)
 	img.heads = otronafs.heads;
 
 	status = cpm_fs_new(&otronafs, &get_sector, NULL, &img, &fs);
-	if (status)
+	if (status != CPM_SUCCESS)
 		goto end;
 
 	status = cpm_fs_opendir(fs, &dirp);
 	if (status != CPM_SUCCESS)
 		goto end;
 
-	struct cpm_fs_file *cpmfile;
-	cpm_fs_readdir(fs, dirp, &cpmfile);
-	while (cpmfile) {
-		printf("%12s [%d][%c%c%c][%u bytes]\n",
-		       cpmfile->d_name,
-		       cpmfile->d_user,
-		       cpmfile->d_flags & CPM_FS_FLAG_SYSTEM ? 'S' : ' ',
-		       cpmfile->d_flags & CPM_FS_FLAG_READONLY ? 'R' : ' ',
-		       cpmfile->d_flags & CPM_FS_FLAG_ARCHIVED ? 'A' : ' ',
-		       cpmfile->d_size);
-		cpm_fs_readdir(fs, dirp, &cpmfile);
+	status = cpm_fs_readdir(fs, dirp, &cpmfile);
+	while (status == CPM_SUCCESS && cpmfile) {
+		if (cpmfile->d_size > 0)
+			dump_file(fs, cpmfile);
+		else
+			printf("Skipped empty file %s\n", cpmfile->d_name);
+		status = cpm_fs_readdir(fs, dirp, &cpmfile);
 	}
 	cpm_fs_closedir(fs, dirp);
 
@@ -115,7 +170,7 @@ int main(int argc, const char *argv[])
 		usage(argv[0]);
 		return EXIT_FAILURE;
 	}
-	if (cpmls(argv[1]))
+	if (list_and_dump(argv[1]))
 		return EXIT_FAILURE;
 	return EXIT_SUCCESS;
 }
