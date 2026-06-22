@@ -103,7 +103,6 @@ enum cpm_fs_status cpm_fs_open(struct cpm_fs *fs,
 	return CPM_SUCCESS;
 }
 
-#include <stdio.h>
 enum cpm_fs_status cpm_fs_read(struct cpm_fs *fs,
 			       struct cpm_fs_file_handle *file_handle,
 			       uint8_t *buf,
@@ -129,15 +128,14 @@ enum cpm_fs_status cpm_fs_read(struct cpm_fs *fs,
 		else
 			block = entry->block_ptr_w[file_handle->block];
 
-		if (!block) /* EOF */ {
-			printf("noblock, EOF (read = %ld)\n", *out_read);
+		if (!block) /* EOF */
 			break;
-		}
 
 		/* Last block size is determined by RC */
 		block_size = fs->attr.block_size;
 		if (extent_nb(entry) == last_extent &&
-		    is_last_block(fs, entry, file_handle->block))
+		    is_last_block(fs, entry, file_handle->block) &&
+		    (entry->rc * 128) % fs->attr.block_size != 0)
 			block_size = (entry->rc * 128) % fs->attr.block_size;
 
 		block_to_chs(fs, block, file_handle->offset, &c, &h, &s);
