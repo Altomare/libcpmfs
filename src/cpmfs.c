@@ -330,7 +330,7 @@ enum cpm_fs_status cpm_fs_write(struct cpm_fs *fs,
 					write_superblock(fs);
 				return CPM_ERR_DISK_FULL;
 			}
-			av_set(fs, new_block, 1);
+			av_set(fs, new_block);
 			entry_set_block(fs, entry, file->block, new_block);
 		}
 	}
