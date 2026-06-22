@@ -365,7 +365,7 @@ cpm_fs_unlink(struct cpm_fs *fs, const char *filename, int user)
 	memcpy(header, &fs->superblock.entries[entry_idx], 12);
 	for (uint32_t i = 0; i < fs->superblock.count; ++i)
 		if (memcmp(header, &fs->superblock.entries[i], 12) == 0)
-			fs->superblock.entries[i].status = 0xE5;
+			wipe_extent(fs, i);
 
 	ret = write_superblock(fs);
 

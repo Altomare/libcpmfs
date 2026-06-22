@@ -49,7 +49,7 @@ int av_build(struct cpm_fs *fs)
 		     fs->attr.block_size;
 
 	for (uint32_t i = 0; i < dir_blocks; ++i)
-		av_set(fs, i, 1);
+		av_set(fs, i);
 
 	/* Mark blocks referenced by valid directory entries */
 	for (uint32_t i = 0; i < fs->superblock.count; ++i) {
@@ -60,21 +60,25 @@ int av_build(struct cpm_fs *fs)
 		if (fs->block_addressing == CPM_BLOCK_ADDR_8) {
 			for (int j = 0; j < 16; ++j)
 				if (entry->block_ptr[j] > 0)
-					av_set(fs, entry->block_ptr[j], 1);
+					av_set(fs, entry->block_ptr[j]);
 		} else {
 			for (int j = 0; j < 8; ++j)
 				if (entry->block_ptr_w[j])
-					av_set(fs, entry->block_ptr_w[j], 1);
+					av_set(fs, entry->block_ptr_w[j]);
 		}
 	}
 
 	return CPM_SUCCESS;
 }
 
-void av_set(struct cpm_fs *fs, int block_index, int value)
+void av_set(struct cpm_fs *fs, int block_index)
 {
-	fs->av[block_index / 8] |=
-		(uint8_t)((uint8_t)value << (block_index % 8));
+	fs->av[block_index / 8] |= (1u << (block_index % 8));
+}
+
+void av_unset(struct cpm_fs *fs, int block_index)
+{
+	fs->av[block_index / 8] &= (~(1u << (block_index % 8)));
 }
 
 int av_get(struct cpm_fs *fs, int block_index)
@@ -189,6 +193,21 @@ static void init_entry(cpm_entry *entry)
 	entry->status = 0xE5;
 	memset(entry->file, 0x20, 8);
 	memset(entry->extension, 0x20, 3);
+}
+
+void wipe_extent(struct cpm_fs *fs, int entry_idx)
+{
+	cpm_entry *entry = &fs->superblock.entries[entry_idx];
+
+	if (fs->block_addressing == CPM_BLOCK_ADDR_8)
+		for (int i = 0; i < 16; ++i)
+			av_unset(fs, entry->block_ptr[i]);
+	else
+		for (int i = 0; i < 8; ++i)
+			av_unset(fs, entry->block_ptr_w[i]);
+
+	entry->status = 0xE5;
+	memset(entry->block_ptr, 0, 16);
 }
 
 static int find_free_entry_idx(struct cpm_fs *fs)

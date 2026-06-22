@@ -112,7 +112,8 @@ void block_to_chs(struct cpm_fs *fs,
 /* 0 on success, negative status on error */
 int av_build(struct cpm_fs *fs);
 
-void av_set(struct cpm_fs *fs, int block_index, int value);
+void av_set(struct cpm_fs *fs, int block_index);
+void av_unset(struct cpm_fs *fs, int block_index);
 int av_get(struct cpm_fs *fs, int block_index);
 
 /* --- Validity checks ------------------------------------------------- */
@@ -158,6 +159,7 @@ int parse_filename(const char *pathname,
 /* Physical extents / directory entries */
 int alloc_new_extent(struct cpm_fs *fs, cpm_entry *src_entry);
 uint32_t get_next_extent(struct cpm_fs *fs, uint32_t extent);
+void wipe_extent(struct cpm_fs *fs, int entry_idx);
 
 bool entry_is_first_extent(struct cpm_fs *fs, uint32_t extent);
 uint32_t get_last_extent(struct cpm_fs *fs, cpm_entry *entry);
