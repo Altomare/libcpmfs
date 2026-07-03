@@ -65,6 +65,10 @@ struct cpm_fs_attr {
 	uint32_t block_size; /* 1024, 2048, 4096, 8192 or 16384 */
 	uint32_t max_dir_entries;
 
+	/* Skew table for physical to logical sector number translation.
+	 * Size is equal to sector_count. Set to NULL for no translation. */
+	uint32_t *skew_table;
+
 	/* Reserved cylinders, mutually exclusive.
 	 * They are still counted in the cylinders field. */
 	uint32_t boot_cylinders; /* On every head */
@@ -170,6 +174,10 @@ enum cpm_fs_status cpm_fs_rename(struct cpm_fs *fs,
 				 int old_user,
 				 const char *new_path,
 				 int new_user);
+
+/* Get the currently available disk space for new files in bytes. */
+enum cpm_fs_status cpm_fs_get_available_space(struct cpm_fs *fs,
+                                              size_t *out_space);
 
 /* Error code to printable string */
 const char *cpm_fs_status_str(enum cpm_fs_status status);

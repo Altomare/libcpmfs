@@ -106,6 +106,7 @@ void block_to_chs(struct cpm_fs *fs,
 		  uint32_t *c,
 		  uint32_t *h,
 		  uint32_t *s);
+uint32_t apply_skew(struct cpm_fs *fs, uint32_t sector);
 
 /* --- Allocation vector ----------------------------------------------- */
 

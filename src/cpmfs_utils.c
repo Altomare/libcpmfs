@@ -98,6 +98,15 @@ uint32_t get_disk_size(struct cpm_fs *fs)
 	return cylinders * fs->attr.sector_size * fs->attr.sector_count;
 }
 
+/* Return 0 if identical */
+static int compare_ext(cpm_entry *entry, const char *ext, size_t ext_len)
+{
+	for (size_t i = 0; i < ext_len; ++i)
+		if ((entry->extension[i] & 0x7F) != ext[i])
+			return -1;
+	return 0;
+}
+
 /* Returns first entry for pathname. Extension doesn't include status flags */
 int32_t find_file(struct cpm_fs *fs, const char *pathname, int user)
 {
@@ -116,11 +125,11 @@ int32_t find_file(struct cpm_fs *fs, const char *pathname, int user)
 	if (tmp) {
 		file_len = (size_t)(tmp - file);
 		tmp += 1;
-		ext_len = 3;
 		for (int i = 0; i < 3; ++i)
 			ext[i] = tmp[i] & 0x7f;
-		if (strchr(tmp, ' '))
-			ext_len = (size_t)(strchr(tmp, ' ') - tmp);
+		ext_len = strnlen(ext, 3);
+		if (strchr(ext, ' '))
+			ext_len = (size_t)(strchr(ext, ' ') - ext);
 	} else {
 		file_len = strlen(file);
 		ext_len = 0;
@@ -133,7 +142,7 @@ int32_t find_file(struct cpm_fs *fs, const char *pathname, int user)
 		if (entry->status != user)
 			continue;
 		if (memcmp(file, entry->file, file_len) != 0 ||
-		    memcmp(ext, entry->extension, ext_len) != 0)
+		    compare_ext(entry, ext, ext_len) != 0)
 			continue;
 
 		/* Make sure to return the first extent */
@@ -198,13 +207,19 @@ static void init_entry(cpm_entry *entry)
 void wipe_extent(struct cpm_fs *fs, int entry_idx)
 {
 	cpm_entry *entry = &fs->superblock.entries[entry_idx];
+	uint32_t dir_blocks = (fs->attr.max_dir_entries * sizeof(cpm_entry) +
+			       fs->attr.block_size - 1) /
+			      fs->attr.block_size;
 
-	if (fs->block_addressing == CPM_BLOCK_ADDR_8)
+	if (fs->block_addressing == CPM_BLOCK_ADDR_8) {
 		for (int i = 0; i < 16; ++i)
-			av_unset(fs, entry->block_ptr[i]);
-	else
+			if (entry->block_ptr[i] > dir_blocks)
+				av_unset(fs, entry->block_ptr[i]);
+	} else {
 		for (int i = 0; i < 8; ++i)
-			av_unset(fs, entry->block_ptr_w[i]);
+			if (entry->block_ptr_w[i] > dir_blocks)
+				av_unset(fs, entry->block_ptr_w[i]);
+	}
 
 	entry->status = 0xE5;
 	memset(entry->block_ptr, 0, 16);
@@ -305,6 +320,13 @@ uint32_t get_next_extent(struct cpm_fs *fs, uint32_t extent)
 	return res;
 }
 
+uint32_t apply_skew(struct cpm_fs *fs, uint32_t sector)
+{
+	if (fs->attr.skew_table == NULL)
+		return sector;
+	return fs->attr.skew_table[sector - 1];
+}
+
 /* For given block and offset, return matching sector */
 void block_to_chs(struct cpm_fs *fs,
 		  uint32_t block,
@@ -315,15 +337,23 @@ void block_to_chs(struct cpm_fs *fs,
 {
 	uint32_t offset;
 	uint32_t sector;
+	uint32_t side_size;
 	uint32_t temp;
 
 	offset = block * fs->attr.block_size + block_offset;
 
 	/* Ignore reserved cylinders */
-	offset += fs->attr.skip_first_cylinders * fs->attr.sector_count *
-		  fs->attr.sector_size;
-	offset += fs->attr.boot_cylinders * fs->attr.sector_count *
-		  fs->attr.sector_size * fs->attr.heads;
+	if (fs->attr.skip_first_cylinders)
+		offset += fs->attr.skip_first_cylinders *
+			  fs->attr.sector_count * fs->attr.sector_size;
+
+	if (fs->attr.boot_cylinders) {
+		side_size = fs->attr.sector_size * fs->attr.sector_count *
+			    (fs->attr.cylinders - fs->attr.boot_cylinders);
+		temp = (offset / side_size) + 1;
+		offset += temp * fs->attr.boot_cylinders *
+			  fs->attr.sector_count * fs->attr.sector_size;
+	}
 
 	sector = offset / fs->attr.sector_size;
 	temp = sector % fs->attr.sector_count;
@@ -331,6 +361,7 @@ void block_to_chs(struct cpm_fs *fs,
 	*c = (sector / fs->attr.sector_count) % fs->attr.cylinders;
 	*h = (sector / fs->attr.sector_count) / fs->attr.cylinders;
 	*s = (temp % fs->attr.sector_count) + 1;
+	*s = apply_skew(fs, *s);
 }
 
 /* Return number of the last physical extent associated with given entry */

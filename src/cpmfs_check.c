@@ -94,7 +94,7 @@ static int check_extent_overlap_wide(struct cpm_fs *fs)
 	qsort(extent_list, fs->attr.max_dir_entries * 8, 2, qsort_comparator_w);
 	for (i = 0; i < fs->attr.max_dir_entries * 8 - 1; ++i)
 		if (extent_list[i] && extent_list[i] == extent_list[i + 1])
-			ret = -CPM_ERR_FILE_OVERLAP;
+			ret = CPM_ERR_FILE_OVERLAP;
 
 	free(extent_list);
 	return ret;
@@ -120,7 +120,7 @@ static int check_extent_overlap(struct cpm_fs *fs)
 	qsort(extent_list, fs->superblock.count * 16, 1, qsort_comparator);
 	for (i = 0; i < fs->superblock.count * 16; ++i)
 		if (extent_list[i] && extent_list[i] == extent_list[i + 1])
-			ret = -CPM_ERR_FILE_OVERLAP;
+			ret = CPM_ERR_FILE_OVERLAP;
 
 	free(extent_list);
 	return ret;

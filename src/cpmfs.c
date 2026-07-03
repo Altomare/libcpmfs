@@ -26,7 +26,8 @@ static int write_superblock(struct cpm_fs *fs)
 			       &fs->superblock.entries[i + j],
 			       sizeof(cpm_entry));
 
-		ret = fs->write_sector(fs->userdata, c, h, s, fs->cache);
+		ret = fs->write_sector(
+			fs->userdata, c, h, apply_skew(fs, s), fs->cache);
 		if (ret)
 			return CPM_ERR_SECTOR_WRITE;
 
@@ -238,12 +239,11 @@ static ssize_t write_block(struct cpm_fs *fs,
 		}
 
 		if (ret != 0)
-			return CPM_ERR_SECTOR_WRITE;
+			return -CPM_ERR_SECTOR_WRITE;
 
 		written += to_write;
 		buf = (uint8_t *)buf + to_write;
 	}
-
 	return (ssize_t)written;
 }
 
@@ -283,7 +283,7 @@ enum cpm_fs_status cpm_fs_write(struct cpm_fs *fs,
 					  (uint8_t *)buf + *out_written,
 					  to_write);
 			if (ret < 0)
-				return ret;
+				return -ret;
 			*out_written += ret;
 			file->offset += (uint32_t)ret;
 		}
@@ -431,6 +431,23 @@ enum cpm_fs_status cpm_fs_rename(struct cpm_fs *fs,
 	return CPM_SUCCESS;
 }
 
+enum cpm_fs_status cpm_fs_get_available_space(struct cpm_fs *fs,
+					      size_t *out_space)
+{
+	uint16_t total_blocks;
+	size_t available_space = 0;
+
+	if (!fs || !out_space)
+		return CPM_ERR_INVALID_ARG;
+
+	total_blocks = fs->disk_size / fs->attr.block_size;
+	for (uint16_t i = 0; i < total_blocks; ++i)
+		if (av_get(fs, i) == 0)
+			available_space += fs->attr.block_size;
+
+	*out_space = available_space;
+	return CPM_SUCCESS;
+}
 
 enum cpm_fs_status cpm_fs_close(struct cpm_fs *fs,
 				struct cpm_fs_file_handle *file_handle)
@@ -577,7 +594,8 @@ static int read_superblock(struct cpm_fs *fs)
 
 	while ((uint32_t)i < sb->count) {
 		j = 0;
-		ret = fs->read_sector(fs->userdata, c, h, s, fs->cache);
+		ret = fs->read_sector(
+			fs->userdata, c, h, apply_skew(fs, s), fs->cache);
 		if (ret != 0)
 			return CPM_ERR_SECTOR_READ;
 
@@ -610,6 +628,27 @@ static int read_superblock(struct cpm_fs *fs)
 	return 0;
 }
 
+#include <stdio.h>
+
+static enum cpm_fs_status set_skew_settings(struct cpm_fs *fs,
+					    struct cpm_fs_attr *attributes)
+{
+	if (attributes->skew_table == NULL) {
+		/* No skew table */
+		fs->attr.skew_table = NULL;
+		return CPM_SUCCESS;
+	}
+
+	fs->attr.skew_table =
+		calloc(sizeof(uint32_t) * attributes->sector_count, 1);
+	if (fs->attr.skew_table == NULL)
+		return CPM_ERR_NOMEM;
+
+	for (uint32_t i = 0; i < fs->attr.sector_count; ++i)
+		fs->attr.skew_table[attributes->skew_table[i] - 1] = i + 1;
+	return CPM_SUCCESS;
+}
+
 enum cpm_fs_status cpm_fs_new(struct cpm_fs_attr *attributes,
 			      read_sector_cb get_sector_cb,
 			      write_sector_cb set_sector_cb,
@@ -631,6 +670,10 @@ enum cpm_fs_status cpm_fs_new(struct cpm_fs_attr *attributes,
 		return CPM_ERR_NOMEM;
 
 	fs->attr = *attributes;
+	fs->attr.skew_table = NULL;
+	if ((err = set_skew_settings(fs, attributes)))
+		goto error;
+
 	fs->read_sector = get_sector_cb;
 	fs->write_sector = set_sector_cb;
 	fs->userdata = userdata;
@@ -663,6 +706,7 @@ enum cpm_fs_status cpm_fs_destroy(struct cpm_fs *fs)
 	if (!fs)
 		return CPM_ERR_INVALID_ARG;
 	free(fs->superblock.entries);
+	free(fs->attr.skew_table);
 	free(fs->cache);
 	free(fs->av);
 	free(fs);
