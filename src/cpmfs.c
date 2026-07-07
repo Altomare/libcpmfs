@@ -9,15 +9,11 @@ static int write_superblock(struct cpm_fs *fs)
 {
 	uint32_t i, j;
 	uint32_t c, h, s;
+	/* Number of entries per sector */
 	uint32_t entries_c = fs->attr.sector_size / sizeof(cpm_entry);
 	int ret;
 
-	/* We assume there will never be any disk where the superblock takes
-	 * more than one track */
-	c = fs->attr.skip_first_cylinders | fs->attr.boot_cylinders;
-	h = 0;
-	s = 1;
-
+	block_to_chs(fs, 0, 0, &c, &h, &s);
 	i = 0;
 	while (i < fs->superblock.count) {
 		memset(fs->cache, 0xE5, fs->attr.sector_size);
@@ -26,16 +22,12 @@ static int write_superblock(struct cpm_fs *fs)
 			       &fs->superblock.entries[i + j],
 			       sizeof(cpm_entry));
 
-		ret = fs->write_sector(
-			fs->userdata, c, h, apply_skew(fs, s), fs->cache);
+		ret = fs->write_sector(fs->userdata, c, h, s, fs->cache);
 		if (ret)
 			return CPM_ERR_SECTOR_WRITE;
 
 		i += j;
-		if (++s > fs->attr.sector_count) {
-			s = 0;
-			c += 1;
-		}
+		block_to_chs(fs, 0, (i * sizeof(cpm_entry)), &c, &h, &s);
 	}
 
 	return CPM_SUCCESS;
@@ -580,12 +572,11 @@ static int read_superblock(struct cpm_fs *fs)
 	int i = 0, j = 0;
 	uint32_t c, h, s;
 	struct cpm_superblock *sb = &fs->superblock;
+	uint32_t entries_c = fs->attr.sector_size / sizeof(cpm_entry);
 	int ret;
 
 	/* Locate superblock */
-	c = fs->attr.skip_first_cylinders | fs->attr.boot_cylinders;
-	h = 0;
-	s = 1;
+	block_to_chs(fs, 0, 0, &c, &h, &s);
 
 	sb->count = fs->attr.max_dir_entries;
 	sb->entries = (cpm_entry *)malloc(sizeof(cpm_entry) * sb->count);
@@ -593,25 +584,17 @@ static int read_superblock(struct cpm_fs *fs)
 		return CPM_ERR_NOMEM;
 
 	while ((uint32_t)i < sb->count) {
-		j = 0;
-		ret = fs->read_sector(
-			fs->userdata, c, h, apply_skew(fs, s), fs->cache);
+		ret = fs->read_sector(fs->userdata, c, h, s, fs->cache);
 		if (ret != 0)
 			return CPM_ERR_SECTOR_READ;
 
-		while (j * sizeof(cpm_entry) < fs->attr.sector_size) {
+		for (j = 0; j < entries_c && i + j < sb->count; ++j)
 			memcpy(&sb->entries[i + j],
 			       fs->cache + j * sizeof(cpm_entry),
 			       sizeof(cpm_entry));
-			j++;
-		}
-		i += j;
 
-		/* Next sector */
-		if (++s > fs->attr.sector_count) {
-			s = 0;
-			c++;
-		}
+		i += j;
+		block_to_chs(fs, 0, (i * sizeof(cpm_entry)), &c, &h, &s);
 	}
 
 	/* Available disk size for extents */
@@ -659,10 +642,6 @@ enum cpm_fs_status cpm_fs_new(struct cpm_fs_attr *attributes,
 	int err = 0;
 
 	if (!get_sector_cb || !attributes || !out)
-		return CPM_ERR_INVALID_ARG;
-
-	/* Mutually exclusive, only one or none must be set */
-	if (attributes->skip_first_cylinders && attributes->boot_cylinders)
 		return CPM_ERR_INVALID_ARG;
 
 	fs = (struct cpm_fs *)calloc(sizeof(struct cpm_fs), 1);

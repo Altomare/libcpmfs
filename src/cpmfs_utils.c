@@ -86,14 +86,13 @@ int av_get(struct cpm_fs *fs, int block_index)
 	return fs->av[block_index / 8] & (1u << (block_index % 8));
 }
 
-/* Available disk size for files, in bytes */
+/* Available disk size for files and superblock, in bytes */
 uint32_t get_disk_size(struct cpm_fs *fs)
 {
 	uint32_t cylinders;
 
 	cylinders = fs->attr.cylinders * fs->attr.heads;
-	cylinders -= fs->attr.skip_first_cylinders;
-	cylinders -= fs->attr.boot_cylinders * fs->attr.heads;
+	cylinders -= fs->attr.boot_cylinders;
 
 	return cylinders * fs->attr.sector_size * fs->attr.sector_count;
 }
@@ -268,7 +267,7 @@ int create_file(struct cpm_fs *fs, const char *pathname, int user)
 	/* Superblock is not written here, this should be done by the caller */
 	return 0;
 }
-#include <stdio.h>
+
 int alloc_new_extent(struct cpm_fs *fs, cpm_entry *src_entry)
 {
 	uint32_t number;
@@ -320,13 +319,6 @@ uint32_t get_next_extent(struct cpm_fs *fs, uint32_t extent)
 	return res;
 }
 
-uint32_t apply_skew(struct cpm_fs *fs, uint32_t sector)
-{
-	if (fs->attr.skew_table == NULL)
-		return sector;
-	return fs->attr.skew_table[sector - 1];
-}
-
 /* For given block and offset, return matching sector */
 void block_to_chs(struct cpm_fs *fs,
 		  uint32_t block,
@@ -338,30 +330,24 @@ void block_to_chs(struct cpm_fs *fs,
 	uint32_t offset;
 	uint32_t sector;
 	uint32_t side_size;
-	uint32_t temp;
 
 	offset = block * fs->attr.block_size + block_offset;
+	sector = offset / fs->attr.sector_size;
 
-	/* Ignore reserved cylinders */
-	if (fs->attr.skip_first_cylinders)
-		offset += fs->attr.skip_first_cylinders *
-			  fs->attr.sector_count * fs->attr.sector_size;
+	*c = (sector / fs->attr.sector_count) + fs->attr.boot_cylinders;
+	*s = (sector % fs->attr.sector_count) + 1;
 
-	if (fs->attr.boot_cylinders) {
-		side_size = fs->attr.sector_size * fs->attr.sector_count *
-			    (fs->attr.cylinders - fs->attr.boot_cylinders);
-		temp = (offset / side_size) + 1;
-		offset += temp * fs->attr.boot_cylinders *
-			  fs->attr.sector_count * fs->attr.sector_size;
+	if (fs->attr.hcs_fill) {
+		*h = (sector / fs->attr.sector_count) / fs->attr.cylinders;
+		*c = *c % fs->attr.cylinders;
+	} else {
+		*h = *c % fs->attr.heads;
+		*c = *c / fs->attr.heads;
 	}
 
-	sector = offset / fs->attr.sector_size;
-	temp = sector % fs->attr.sector_count;
-
-	*c = (sector / fs->attr.sector_count) % fs->attr.cylinders;
-	*h = (sector / fs->attr.sector_count) / fs->attr.cylinders;
-	*s = (temp % fs->attr.sector_count) + 1;
-	*s = apply_skew(fs, *s);
+	/* Apply skew factor */
+	if (fs->attr.skew_table != NULL)
+		*s = fs->attr.skew_table[*s - 1];
 }
 
 /* Return number of the last physical extent associated with given entry */

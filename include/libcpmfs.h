@@ -69,13 +69,15 @@ struct cpm_fs_attr {
 	 * Size is equal to sector_count. Set to NULL for no translation. */
 	uint32_t *skew_table;
 
-	/* Reserved cylinders, mutually exclusive.
-	 * They are still counted in the cylinders field. */
-	uint32_t boot_cylinders; /* On every head */
-	uint32_t skip_first_cylinders; /* On first head */
+	/* Number of cylinders reserved by CP/M */
+	uint32_t boot_cylinders;
 
-	/* Skew and interleave settings are not needed here, as sector
-	 * numbering is given by the floppy driver. */
+	/* The settings below only apply for a select few machines */
+
+	/* This only applies for a very few machines, where the disk is filled
+	 * in the H->C->S order instead of the usual C->H->S.
+	 * Set to 1 for HCS, 0 for CHS. */
+	uint32_t hcs_fill;
 };
 
 #define CPM_FS_FLAG_SYSTEM 0x1
@@ -177,7 +179,7 @@ enum cpm_fs_status cpm_fs_rename(struct cpm_fs *fs,
 
 /* Get the currently available disk space for new files in bytes. */
 enum cpm_fs_status cpm_fs_get_available_space(struct cpm_fs *fs,
-                                              size_t *out_space);
+					      size_t *out_space);
 
 /* Error code to printable string */
 const char *cpm_fs_status_str(enum cpm_fs_status status);
