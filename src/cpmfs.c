@@ -73,9 +73,6 @@ enum cpm_fs_status cpm_fs_open(struct cpm_fs *fs,
 			ret = create_file(fs, pathname, user);
 			if (ret != CPM_SUCCESS)
 				return ret;
-			ret = write_superblock(fs);
-			if (ret != CPM_SUCCESS)
-				return ret;
 			entry = find_file(fs, pathname, user);
 			if (entry == -1)
 				/* Should never happen */
@@ -315,19 +312,12 @@ enum cpm_fs_status cpm_fs_write(struct cpm_fs *fs,
 
 			/* Allocate new block */
 			uint16_t new_block = find_free_block(fs);
-			if (!new_block) {
-				if (*out_written)
-					write_superblock(fs);
+			if (!new_block)
 				return CPM_ERR_DISK_FULL;
-			}
 			av_set(fs, new_block);
 			entry_set_block(fs, entry, file->block, new_block);
 		}
 	}
-
-	ret = write_superblock(fs);
-	if (ret != 0)
-		return ret;
 
 	return CPM_SUCCESS;
 }
@@ -357,9 +347,7 @@ cpm_fs_unlink(struct cpm_fs *fs, const char *filename, int user)
 		if (memcmp(header, &fs->superblock.entries[i], 12) == 0)
 			wipe_extent(fs, i);
 
-	ret = write_superblock(fs);
-
-	return ret;
+	return CPM_SUCCESS;
 }
 
 enum cpm_fs_status cpm_fs_rename(struct cpm_fs *fs,
@@ -691,6 +679,14 @@ enum cpm_fs_status cpm_fs_destroy(struct cpm_fs *fs)
 	free(fs);
 
 	return CPM_SUCCESS;
+}
+
+enum cpm_fs_status cpm_fs_sync(struct cpm_fs *fs)
+{
+	if (!fs)
+		return CPM_ERR_INVALID_ARG;
+
+	return write_superblock(fs);
 }
 
 const char *cpm_fs_status_str(enum cpm_fs_status status)

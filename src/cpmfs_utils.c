@@ -335,7 +335,7 @@ void block_to_chs(struct cpm_fs *fs,
 	sector = offset / fs->attr.sector_size;
 
 	*c = (sector / fs->attr.sector_count) + fs->attr.boot_cylinders;
-	*s = (sector % fs->attr.sector_count) + 1;
+	*s = (sector % fs->attr.sector_count);
 
 	if (fs->attr.hcs_fill) {
 		*h = (sector / fs->attr.sector_count) / fs->attr.cylinders;
@@ -347,7 +347,7 @@ void block_to_chs(struct cpm_fs *fs,
 
 	/* Apply skew factor */
 	if (fs->attr.skew_table != NULL)
-		*s = fs->attr.skew_table[*s - 1];
+		*s = fs->attr.skew_table[*s] - 1;
 }
 
 /* Return number of the last physical extent associated with given entry */

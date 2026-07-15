@@ -66,7 +66,8 @@ struct cpm_fs_attr {
 	uint32_t max_dir_entries;
 
 	/* Skew table for physical to logical sector number translation.
-	 * Size is equal to sector_count. Set to NULL for no translation. */
+	 * Size is equal to sector_count. Set to NULL for no translation.
+	 * Sector numbering start at 1 in this table. */
 	uint32_t *skew_table;
 
 	/* Number of cylinders reserved by CP/M */
@@ -95,7 +96,8 @@ struct cpm_fs_file {
 
 /* Returns 0 for success.
  * in_sector & out_sector should match the sector_size specified in cpm_fs_attr.
- * Note: cylinder & head numbering start at 0. sector starts at 1. */
+ * sector is the position from the index pulse, not the ID from the headers.
+ * Note: every value start at zero, sector included.. */
 typedef int (*read_sector_cb)(void *userdata,
 			      uint32_t cylinder,
 			      uint32_t head,
@@ -113,7 +115,7 @@ struct cpm_fs_dir;
 struct cpm_fs_file_handle;
 
 /* Every function returns a cpm_fs_status value.
- * CPM_SUCCESS (0) on success, other values on error. */
+ * CPM_SUCCESS (0) on success, other positive values on error. */
 
 /* File names are case-sensitive. The CCP (command line interface) forces
  * upper case, so almost every file is in uppercase. However, some software
@@ -125,6 +127,10 @@ enum cpm_fs_status cpm_fs_new(struct cpm_fs_attr *attributes,
 			      void *userdata,
 			      struct cpm_fs **out);
 enum cpm_fs_status cpm_fs_destroy(struct cpm_fs *fs);
+
+/* Write superblock (file allocation table) to disk. This should be called
+ * when done with creating and writing files, to log changes to the disk. */
+enum cpm_fs_status cpm_fs_sync(struct cpm_fs *fs);
 
 /* Directory, no name argument needed as there are no subdirectories */
 enum cpm_fs_status cpm_fs_opendir(struct cpm_fs *fs,
