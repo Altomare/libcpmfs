@@ -22,15 +22,15 @@ static struct cpm_fs_attr otronafs = {
 	.sector_size = 512,
 	.block_size = 2048,
 	.max_dir_entries = 128,
-	.boot_cylinders = 0,
-	.skip_first_cylinders = 3,
+	.boot_cylinders = 3,
+	.fill_order = CPM_FILL_HCS,
 };
 
 /* For CHS raw sector images */
 static int get_sector(void *userdata,
 		      uint32_t cylinder,
 		      uint32_t head,
-		      uint32_t sector, /* Start at 1 */
+		      uint32_t sector,
 		      uint8_t *out_sector)
 {
 	disk_image *disk = (disk_image *)userdata;
@@ -42,7 +42,7 @@ static int get_sector(void *userdata,
 		return -EINVAL;
 
 	offset += cylinder * cylinder_size * 2;
-	offset += (sector - 1) * disk->sector_size;
+	offset += sector * disk->sector_size;
 	if (head == 1)
 		offset += disk->sector_count * disk->sector_size;
 	ret = fseek(disk->handle, offset, SEEK_SET);
@@ -100,6 +100,8 @@ static int cpmls(const char *file)
 	cpm_fs_destroy(fs);
 
 end:
+	if (status != CPM_SUCCESS)
+		fprintf(stderr, "libcpmfs: %s\n", cpm_fs_status_str(status));
 	fclose(img.handle);
 	return 0;
 }

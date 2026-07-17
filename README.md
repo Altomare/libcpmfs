@@ -1,11 +1,11 @@
 # libcpmfs
 
 libcpmfs is a simple C library for manipulating CP/M filesystems.
-It is intended to be used alongsize a disk manipulation util such as libhxcfe
-or libdsk.
+It is intended to be used alongside a disk manipulation tool such as libhxcfe or
+libdsk.
 
 This is not made for data recovery on damaged disks.
-If the superblock (basically the disk header) is corrupted, there will be errors.
+If the superblock is corrupted, there will be errors.
 
 
 ## How to use
@@ -23,7 +23,7 @@ Filesystem attributes is a structure containing attributes relative to the type
 of disk you're trying to read:
 * Disk geometry
   * Cylinders: number of cylinders (tracks) per side, includes reserved ones.
-  * Heads: number of heads. 1 or 2 on floppy disks, can be more on hdds.
+  * Heads: number of heads. 1 or 2 on floppy disks, can be more on hard drives.
   * Sector count: number of sectors per cylinder.
   * Sector size: size of sector data (in bytes)
 * CP/M attributes:
@@ -32,7 +32,7 @@ of disk you're trying to read:
 * Reserved cylinders (usually occupied by CP/M)
 * Skew table: if the sectors are interleaved, this contains the sector numbers
 * Fill order: if the disk is filled in a non-standard order
-              (eg. side by side instead of cylinder by cylinder)
+              (e.g. side by side instead of cylinder by cylinder)
 
 The `examples` directory contains a small implementation sample for reading a
 directory and listing files.
@@ -62,12 +62,12 @@ notify the user there's something wrong with the given disk geometry, as the
 file table would have conflicts.
 
 But there are cases where there might be two files pointing to the same blocks
-intentionally. For instance, an util might create a file pointing to bad blocks,
+intentionally. For instance, software can create a file pointing to bad blocks,
 to reserve them and prevent the OS from writing to them. If a file was already
 using such a block, we'll have two files pointing to the same block.
 
 So far I only found a case with `[UNUSED].BAD` files, which list bad sectors via
-the `FINDBAD` util. These files won't cause the error, because the bracket
+the `FINDBAD` tool. These files won't cause the error, because the bracket
 characters are considered to be an invalid filename.
 
 It's still possible to encounter more of these scenarios in the wild. If so,
@@ -79,21 +79,15 @@ please do tell me so I can add workarounds. Alan R. Miller's book mentions
 
 Features:
  * OS version for different FS attributes. Only 2.x is supported now.
- * Logical to physical sector translation table (mostly for CP/M 1.4)
  * Support seek
 
 Improvements:
- * Do not write the whole superblock at one, only the modified sectors
- * Add a NO_SYNC option where the superblock is only written when a sync()
-   function is called by the user
  * More example code
  * Glossary, and check for inconsistent nomenclature (entry vs. extent for instance)
 
 Testing:
- * Tests & examples
  * Check for endianness bugs depending on the host endian.
    Might cause issue with 16-bit block addressing
- * Gather many disk images for testing
  * Debug logs
 
 
@@ -101,7 +95,7 @@ Testing:
 
 Books:
 * CP/M 2.0 manual. [PDF](http://www.cpm.z80.de/manuals/SC-CPM.pdf)
-* Mastering CP/M by Alan R. Miller. [OCR PDF](https://oldcomputers.dyndns.org/public/pub/manuals/mastering_cpm.pdf)
+* Mastering CP/M by Alan R. Miller. [PDF](https://oldcomputers.dyndns.org/public/pub/manuals/mastering_cpm.pdf)
 
 Websites:
 * [Seasip - John Elliott's website](https://www.seasip.info/Cpm/index.html)
