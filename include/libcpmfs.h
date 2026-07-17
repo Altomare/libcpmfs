@@ -54,16 +54,25 @@ enum cpm_fs_mode {
 	CPM_MODE_RDWR,
 };
 
+enum cpm_fs_fill_order {
+	/* Standard CP/M disk layout (CHS).
+	 * Fill cylinders on each head before increasing the cylinder number. */
+	CPM_FILL_NORMAL = 0,
+	/* Side-by-side layout (HCS).
+	 * Sides are filled cylinder-by-cylinder before going to the next one.*/
+	CPM_FILL_HCS = 1,
+};
+
 struct cpm_fs_attr {
 	/* Disk geometry */
 	uint32_t cylinders;
 	uint32_t heads;
 	uint32_t sector_count;
-	uint32_t sector_size;
+	uint32_t sector_size; /* in bytes */
 
 	/* Filesystem attributes */
 	uint32_t block_size; /* 1024, 2048, 4096, 8192 or 16384 */
-	uint32_t max_dir_entries;
+	uint32_t max_dir_entries; /* Maximum directory entries in superblock */
 
 	/* Skew table for physical to logical sector number translation.
 	 * Size is equal to sector_count. Set to NULL for no translation.
@@ -73,12 +82,10 @@ struct cpm_fs_attr {
 	/* Number of cylinders reserved by CP/M */
 	uint32_t boot_cylinders;
 
-	/* The settings below only apply for a select few machines */
+	/* The settings below only apply for a select few machines. */
 
-	/* This only applies for a very few machines, where the disk is filled
-	 * in the H->C->S order instead of the usual C->H->S.
-	 * Set to 1 for HCS, 0 for CHS. */
-	uint32_t hcs_fill;
+	/* Determines in which order the disk is filled */
+	uint32_t fill_order;
 };
 
 #define CPM_FS_FLAG_SYSTEM 0x1
@@ -97,7 +104,7 @@ struct cpm_fs_file {
 /* Returns 0 for success.
  * in_sector & out_sector should match the sector_size specified in cpm_fs_attr.
  * sector is the position from the index pulse, not the ID from the headers.
- * Note: every value start at zero, sector included.. */
+ * Note: every value start at zero, sector included. */
 typedef int (*read_sector_cb)(void *userdata,
 			      uint32_t cylinder,
 			      uint32_t head,

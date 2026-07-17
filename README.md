@@ -14,9 +14,10 @@ To interface with libcpmfs, you need to provide the following:
 * Sector callback
 * Filesystem attributes
 
-The sector callback is a way for libcpmfs to request any given sector, addressed
-in CHS (cylinder/head/sector). Only the sector data is requested, without
-the headers.
+The sector callback is needed by libcpmfs to request any given sector, addressed
+in CHS (cylinder/head/sector). The sector number is the number relative to the
+index pulse, starting at zero. Only the sector data is requested, without the
+headers.
 
 Filesystem attributes is a structure containing attributes relative to the type
 of disk you're trying to read:
@@ -29,6 +30,9 @@ of disk you're trying to read:
   * Block size: size of logical blocks. Cannot be smaller than a sector
   * Maximum directory entries: how many entries can fit on the disk
 * Reserved cylinders (usually occupied by CP/M)
+* Skew table: if the sectors are interleaved, this contains the sector numbers
+* Fill order: if the disk is filled in a non-standard order
+              (eg. side by side instead of cylinder by cylinder)
 
 The `examples` directory contains a small implementation sample for reading a
 directory and listing files.

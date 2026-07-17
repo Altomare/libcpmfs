@@ -329,7 +329,6 @@ void block_to_chs(struct cpm_fs *fs,
 {
 	uint32_t offset;
 	uint32_t sector;
-	uint32_t side_size;
 
 	offset = block * fs->attr.block_size + block_offset;
 	sector = offset / fs->attr.sector_size;
@@ -337,7 +336,7 @@ void block_to_chs(struct cpm_fs *fs,
 	*c = (sector / fs->attr.sector_count) + fs->attr.boot_cylinders;
 	*s = (sector % fs->attr.sector_count);
 
-	if (fs->attr.hcs_fill) {
+	if (fs->attr.fill_order == CPM_FILL_HCS) {
 		*h = (sector / fs->attr.sector_count) / fs->attr.cylinders;
 		*c = *c % fs->attr.cylinders;
 	} else {
