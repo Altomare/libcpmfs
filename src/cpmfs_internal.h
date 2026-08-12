@@ -94,6 +94,11 @@ struct cpm_fs {
 	void *userdata;
 };
 
+struct cpm_fs_crawler {
+	uint8_t *buf;
+	uint32_t block;
+};
+
 
 /* --- Disk utils ------------------------------------------------------ */
 

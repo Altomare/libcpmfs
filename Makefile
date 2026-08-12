@@ -5,7 +5,7 @@ OBJ_DIR := $(BUILD_DIR)/obj
 STATIC_LIB := $(BUILD_DIR)/libcpmfs.a
 DYN_LIB := $(BUILD_DIR)/libcpmfs.so
 
-SRC := src/cpmfs.c src/cpmfs_utils.c src/cpmfs_check.c
+SRC := src/cpmfs.c src/cpmfs_utils.c src/cpmfs_check.c src/cpmfs_tools.c
 
 OBJECTS := $(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRC))
 
