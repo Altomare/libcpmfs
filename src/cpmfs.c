@@ -467,11 +467,14 @@ enum cpm_fs_status cpm_fs_readdir(struct cpm_fs *fs,
 	entry = &fs->superblock.entries[dirp->current_file_ino];
 
 	/* Copy file name without status flags */
-	filename_out = (uint8_t *)dirp->file.d_name;
 	memset(&dirp->file, 0, sizeof(struct cpm_fs_file));
-	i = -1;
-	while (++i < 8 && (entry->file[i] & 0x7f) != 0x20)
-		*(filename_out++) = entry->file[i] & 0x7f;
+	filename_out = (uint8_t *)dirp->file.d_name;
+
+	for (i = 0; i < 8; ++i)
+		filename_out[i] = entry->file[i] & 0x7f;
+	for (i = 7; i >= 0 && filename_out[i] == 0x20; --i)
+		filename_out[i] = 0;
+	filename_out += i + 1;
 	if ((entry->extension[0] & 0x7f) != 0x20) {
 		*(filename_out++) = '.';
 		i = -1;
@@ -599,8 +602,6 @@ static int read_superblock(struct cpm_fs *fs)
 
 	return 0;
 }
-
-#include <stdio.h>
 
 static enum cpm_fs_status set_skew_settings(struct cpm_fs *fs,
 					    struct cpm_fs_attr *attributes)

@@ -98,60 +98,21 @@ uint32_t get_disk_size(struct cpm_fs *fs)
 }
 
 /* Return 0 if identical */
-static int compare_ext(cpm_entry *entry, const char *ext, size_t ext_len)
+static int compare_name(cpm_entry *entry, const char *file)
 {
-	for (size_t i = 0; i < ext_len; ++i)
-		if ((entry->extension[i] & 0x7F) != ext[i])
+	for (size_t i = 0; i < 8; ++i)
+		if ((entry->file[i] & 0x7F) != file[i])
 			return -1;
 	return 0;
 }
 
-/* Returns first entry for pathname. Extension doesn't include status flags */
-int32_t find_file(struct cpm_fs *fs, const char *pathname, int user)
+/* Return 0 if identical */
+static int compare_ext(cpm_entry *entry, const char *extension)
 {
-	cpm_entry *entry;
-	char *file = NULL;
-	char *tmp = NULL;
-	char ext[3];
-	size_t file_len, ext_len;
-	int file_extent = -1;
-
-	file = (char *)pathname;
-	if (*file == '/')
-		++file;
-
-	tmp = strchr(file, '.');
-	if (tmp) {
-		file_len = (size_t)(tmp - file);
-		tmp += 1;
-		for (int i = 0; i < 3; ++i)
-			ext[i] = tmp[i] & 0x7f;
-		ext_len = strnlen(ext, 3);
-		if (strchr(ext, ' '))
-			ext_len = (size_t)(strchr(ext, ' ') - ext);
-	} else {
-		file_len = strlen(file);
-		ext_len = 0;
-	}
-	if (file_len == 0)
-		return 1;
-
-	for (uint32_t i = 0; i < fs->superblock.count; ++i) {
-		entry = &fs->superblock.entries[i];
-		if (entry->status != user)
-			continue;
-		if (memcmp(file, entry->file, file_len) != 0 ||
-		    compare_ext(entry, ext, ext_len) != 0)
-			continue;
-
-		/* Make sure to return the first extent */
-		if (file_extent == -1 ||
-		    extent_nb(entry) <
-			    extent_nb(&fs->superblock.entries[file_extent]))
-			file_extent = i;
-	}
-
-	return file_extent;
+	for (size_t i = 0; i < 3; ++i)
+		if ((entry->extension[i] & 0x7F) != extension[i])
+			return -1;
+	return 0;
 }
 
 /* If the filename is valid, return zero and store pointers & lengths.
@@ -192,6 +153,64 @@ int parse_filename(const char *pathname,
 	if (*out_extlen)
 		*out_ext = ext;
 	return 0;
+}
+
+/* Returns first entry for pathname. Extension doesn't include status flags */
+int32_t find_file(struct cpm_fs *fs, const char *pathname, int user)
+{
+	char input_name[8];
+	char input_ext[8];
+	char *file = NULL;
+	char *dot = NULL;
+	size_t file_len = 0;
+	size_t ext_len = 0;
+	int file_extent = -1;
+
+	file = (char *)pathname;
+	if (*file == '/')
+		++file;
+
+	memset(input_name, 0x20, 8);
+	memset(input_ext, 0x20, 3);
+
+	/* TODO: Merge with parse_filename and merge contents */
+	dot = strchr(file, '.');
+	if (dot) {
+		/* Filename */
+		file_len = (size_t)(dot - file);
+		if (file_len <= 0 || file_len > 8)
+			return -1;
+		memcpy(input_name, file, file_len);
+
+		/* Extension */
+		ext_len = strlen(dot + 1);
+		if (ext_len < 0 || ext_len > 3)
+			return -1;
+		memcpy(input_ext, dot + 1, ext_len);
+	} else {
+		file_len = strlen(file);
+		if (file_len <= 0 || file_len > 8)
+			return -1;
+		memcpy(input_name, file, file_len);
+	}
+
+	for (uint32_t i = 0; i < fs->superblock.count; ++i) {
+		cpm_entry *entry = &fs->superblock.entries[i];
+
+		if (entry->status != user)
+			continue;
+		if (compare_name(entry, input_name) != 0 ||
+		    compare_ext(entry, input_ext) != 0)
+			continue;
+
+		/* Make sure to return the first extent */
+		if (file_extent == -1 ||
+		    extent_nb(entry) <
+			    extent_nb(&fs->superblock.entries[file_extent]))
+			file_extent = i;
+	}
+
+	return file_extent;
 }
 
 static void init_entry(cpm_entry *entry)
