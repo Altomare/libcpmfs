@@ -94,7 +94,7 @@ enum cpm_fs_status cpm_fs_open(struct cpm_fs *fs,
 }
 
 enum cpm_fs_status cpm_fs_read(struct cpm_fs *fs,
-			       struct cpm_fs_file_handle *file_handle,
+			       struct cpm_fs_file_handle *fh,
 			       uint8_t *buf,
 			       size_t count,
 			       size_t *out_read)
@@ -106,17 +106,17 @@ enum cpm_fs_status cpm_fs_read(struct cpm_fs *fs,
 	uint32_t c, h, s;
 	int ret = 0;
 
-	if (!fs || !file_handle || !buf || count == 0 || !out_read)
+	if (!fs || !fh || !buf || count == 0 || !out_read)
 		return CPM_ERR_INVALID_ARG;
 
 	*out_read = 0;
-	entry = &fs->superblock.entries[file_handle->entry];
+	entry = &fs->superblock.entries[fh->entry];
 	last_extent = get_last_extent(fs, entry);
 	while (count) {
 		if (fs->block_addressing == CPM_BLOCK_ADDR_8)
-			block = entry->block_ptr[file_handle->block];
+			block = entry->block_ptr[fh->block];
 		else
-			block = entry->block_ptr_w[file_handle->block];
+			block = entry->block_ptr_w[fh->block];
 
 		if (!block) /* EOF */
 			break;
@@ -124,48 +124,49 @@ enum cpm_fs_status cpm_fs_read(struct cpm_fs *fs,
 		/* Last block size is determined by RC */
 		block_size = fs->attr.block_size;
 		if (extent_nb(entry) == last_extent &&
-		    is_last_block(fs, entry, file_handle->block) &&
+		    is_last_block(fs, entry, fh->block) &&
 		    (entry->rc * 128) % fs->attr.block_size != 0)
 			block_size = (entry->rc * 128) % fs->attr.block_size;
 
-		block_to_chs(fs, block, file_handle->offset, &c, &h, &s);
+		/* Read sector into cache */
+		block_to_chs(fs, block, fh->offset, &c, &h, &s);
 		ret = fs->read_sector(fs->userdata, c, h, s, fs->cache);
 		if (ret != 0)
 			return CPM_ERR_SECTOR_READ;
 
-		uint32_t block_offset =
-			file_handle->offset % fs->attr.sector_size;
+		uint32_t sector_offset =
+			fh->offset % fs->attr.sector_size;
 
 		/* Compute size to read */
 		uint32_t size_to_read = fs->attr.sector_size;
-		if (block_size - block_offset < fs->attr.sector_size)
-			size_to_read = block_size - block_offset;
+		if (block_size - fh->offset< fs->attr.sector_size)
+			size_to_read = block_size - fh->offset;
 		if (count < size_to_read)
 			size_to_read = count;
 
-		memcpy(buf, fs->cache + block_offset, size_to_read);
+		/* cache -> out*/
+		memcpy(buf, fs->cache + sector_offset, size_to_read);
 		*out_read += size_to_read;
 		count -= size_to_read;
-		file_handle->offset += size_to_read;
+		fh->offset += size_to_read;
 		buf += size_to_read;
 
 		/* Keep reading the same block */
-		if (file_handle->offset < block_size)
+		if (fh->offset < block_size)
 			continue;
 
 		/* Next block */
-		file_handle->block += 1;
-		file_handle->offset = 0;
+		fh->block += 1;
+		fh->offset = 0;
 		if ((fs->block_addressing == CPM_BLOCK_ADDR_8 &&
-		     file_handle->block >= 16) ||
+		     fh->block >= 16) ||
 		    (fs->block_addressing == CPM_BLOCK_ADDR_16 &&
-		     file_handle->block >= 8)) {
-			file_handle->entry =
-				get_next_extent(fs, file_handle->entry);
-			file_handle->block = 0;
-			if (!file_handle->entry) /* EOF */
+		     fh->block >= 8)) {
+			fh->entry = get_next_extent(fs, fh->entry);
+			fh->block = 0;
+			if (!fh->entry) /* EOF */
 				break;
-			entry = &fs->superblock.entries[file_handle->entry];
+			entry = &fs->superblock.entries[fh->entry];
 			last_extent = get_last_extent(fs, entry);
 		}
 	}
