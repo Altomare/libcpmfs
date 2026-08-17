@@ -5,8 +5,8 @@
 
 #include "cpmfs_internal.h"
 
-enum cpm_fs_status cpm_fs_get_init_crawler(struct cpm_fs *fs,
-					   struct cpm_fs_crawler **out_crawler)
+enum cpm_fs_status cpm_fs_init_crawler(struct cpm_fs *fs,
+				       struct cpm_fs_crawler **out_crawler)
 {
 	struct cpm_fs_crawler *res;
 
@@ -63,8 +63,8 @@ enum cpm_fs_status cpm_fs_get_unused_blocks(struct cpm_fs *fs,
 	return CPM_SUCCESS;
 }
 
-enum cpm_fs_status cpm_fs_get_destroy_crawler(struct cpm_fs *fs,
-					      struct cpm_fs_crawler *crawler)
+enum cpm_fs_status cpm_fs_destroy_crawler(struct cpm_fs *fs,
+					  struct cpm_fs_crawler *crawler)
 {
 	if (!fs || !crawler)
 		return CPM_ERR_INVALID_ARG;

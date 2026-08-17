@@ -204,14 +204,14 @@ struct cpm_fs_crawler;
 
 /* Get each unused block contents from the disk.
  * cpm_fs_get_unused block returns a buffer of size block_size + 1 or NULL when
- * done. */
-enum cpm_fs_status cpm_fs_get_init_crawler(struct cpm_fs *fs,
-					   struct cpm_fs_crawler **out_crawler);
+ * done. It is freed automatically when calling cpm_fs_destroy_crawler. */
+enum cpm_fs_status cpm_fs_init_crawler(struct cpm_fs *fs,
+				       struct cpm_fs_crawler **out_crawler);
 enum cpm_fs_status cpm_fs_get_unused_blocks(struct cpm_fs *fs,
 					    struct cpm_fs_crawler *crawler,
 					    uint8_t **out_buf);
-enum cpm_fs_status cpm_fs_get_destroy_crawler(struct cpm_fs *fs,
-					      struct cpm_fs_crawler *crawler);
+enum cpm_fs_status cpm_fs_destroy_crawler(struct cpm_fs *fs,
+					  struct cpm_fs_crawler *crawler);
 
 /* Replace every unused block contents with 0xE5 */
 enum cpm_fs_status cpm_fs_wipe_unused_sectors(struct cpm_fs *fs);
