@@ -78,6 +78,13 @@ struct cpm_fs_attr {
 	 * Size is equal to sector_count. Set to NULL for no translation.
 	 * Sector numbering start at 1 in this table. */
 	uint32_t *skew_table;
+	/* Number of sectors between two consecutive ones. Set to 0 for no skew.
+	 * For instance, skew_factor=2 and sector_count=10 will make the
+	 * following table: 1 6 2 7 3 8 4 9 5 10
+	 *
+	 * skew_table and skew_table are mutually exclusive.
+	 */
+	uint32_t skew_factor;
 
 	/* Number of cylinders reserved by CP/M */
 	uint32_t boot_cylinders;

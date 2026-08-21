@@ -134,12 +134,11 @@ enum cpm_fs_status cpm_fs_read(struct cpm_fs *fs,
 		if (ret != 0)
 			return CPM_ERR_SECTOR_READ;
 
-		uint32_t sector_offset =
-			fh->offset % fs->attr.sector_size;
+		uint32_t sector_offset = fh->offset % fs->attr.sector_size;
 
 		/* Compute size to read */
 		uint32_t size_to_read = fs->attr.sector_size;
-		if (block_size - fh->offset< fs->attr.sector_size)
+		if (block_size - fh->offset < fs->attr.sector_size)
 			size_to_read = block_size - fh->offset;
 		if (count < size_to_read)
 			size_to_read = count;
@@ -606,19 +605,44 @@ static int read_superblock(struct cpm_fs *fs)
 static enum cpm_fs_status set_skew_settings(struct cpm_fs *fs,
 					    struct cpm_fs_attr *attributes)
 {
-	if (attributes->skew_table == NULL) {
-		/* No skew table */
-		fs->attr.skew_table = NULL;
-		return CPM_SUCCESS;
-	}
+	uint32_t *tmp_table;
+
+	if (attributes->skew_table == NULL && attributes->skew_factor == 0)
+		return CPM_SUCCESS; /* No skew */
+
+	if (attributes->skew_table != NULL && attributes->skew_factor != 0)
+		return CPM_ERR_INVALID_ARG; /* Can't have both */
 
 	fs->attr.skew_table =
 		calloc(sizeof(uint32_t) * attributes->sector_count, 1);
-	if (fs->attr.skew_table == NULL)
+	tmp_table = calloc(sizeof(uint32_t) * attributes->sector_count, 1);
+	if (fs->attr.skew_table == NULL || tmp_table == NULL) {
+		free(fs->attr.skew_table);
 		return CPM_ERR_NOMEM;
+	}
 
-	for (uint32_t i = 0; i < fs->attr.sector_count; ++i)
-		fs->attr.skew_table[attributes->skew_table[i] - 1] = i + 1;
+	if (attributes->skew_table) {
+		/* Invert skew table: table[wanted_sector] = real_position */
+		for (uint32_t i = 0; i < fs->attr.sector_count; ++i)
+			fs->attr.skew_table[attributes->skew_table[i] - 1] =
+				i + 1;
+	} else {
+		tmp_table[0] = 1;
+		uint32_t j = fs->attr.skew_factor;
+		for (uint32_t i = 2; i <= fs->attr.sector_count; ++i) {
+			if (j >= fs->attr.sector_count)
+				for (j = 0; tmp_table[j] != 0; ++j)
+					;
+			tmp_table[j] = i;
+			j += fs->attr.skew_factor;
+		}
+
+		/* Invert skew table: table[wanted_sector] = real_position */
+		for (uint32_t i = 0; i < fs->attr.sector_count; ++i)
+			fs->attr.skew_table[tmp_table[i] - 1] = i + 1;
+	}
+	free(tmp_table);
+
 	return CPM_SUCCESS;
 }
 
@@ -639,7 +663,6 @@ enum cpm_fs_status cpm_fs_new(struct cpm_fs_attr *attributes,
 		return CPM_ERR_NOMEM;
 
 	fs->attr = *attributes;
-	fs->attr.skew_table = NULL;
 	if ((err = set_skew_settings(fs, attributes)))
 		goto error;
 

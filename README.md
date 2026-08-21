@@ -30,12 +30,18 @@ of disk you're trying to read:
   * Block size: size of logical blocks. Cannot be smaller than a sector
   * Maximum directory entries: how many entries can fit on the disk
 * Reserved cylinders (usually occupied by CP/M)
-* Skew table: if the sectors are interleaved, this contains the sector numbers
+* Skew/Interleave: 
+  * Skew Table: list of real sector numbers based on their position from index
+  * Skew Factor: how many sectors between 2 consecutive numbers
+    Skew table and factor are mutually exclusive
 * Fill order: if the disk is filled in a non-standard order
               (e.g. side by side instead of cylinder by cylinder)
 
 The `examples` directory contains a small implementation sample for reading a
-directory and listing files.
+directory and listing files. You can also check out
+[libcpmfs-tools](https://github.com/Altomare/libcpmfs-tools),
+which contain command line tools and tests using `libhxcfe` from
+[HxCFloppyEmulator](https://github.com/jfdelnero/HxCFloppyEmulator)
 
 
 ## Limitations
@@ -74,6 +80,33 @@ It's still possible to encounter more of these scenarios in the wild. If so,
 please do tell me so I can add workarounds. Alan R. Miller's book mentions
 `BADLIM` and `RECLAIM` as tools that work like this, but I haven't tested them.
 
+## Sector numbering and skew
+
+There are many ways to order sectors on CP/M, which vary on a per-machine basis.
+There's physical order on disk with numbers in the sector headers, a potential
+translation done by the BIOS routines directly, and the sector translation table
+contained in the BIOS and used by BDOS.
+
+Some examples:
+* Otrona Attaché:
+  * Physical sectors are skewed/interleaved with a factor of 2 -> 1, 6, 2, 7...
+  * The BIOS reading routine addresses addresses sectors by their number and the
+    controller chip finds it
+  * There's no translation table in the OS.
+  * The interleave is solely done by the format command; it could be changed
+    arbitrarily and the machine would still work
+* Zorba:
+  * Physical sectors are ordered on side 0 (1->10) & continue on side 1 (11->20)
+  * The side number in sector headers is always zero
+  * No translation table
+
+As such, I chose to address sector by their position from the index pulse
+instead of their ID. This means the skew factor from other disk definitions
+such as 22disk or cpmtools might not fit. For instance the Otrona wouldn't
+require any skew factor when addressing the sector by their number.
+
+22disk solves that issue by inputting both the skew factor and the physical
+sector order, but I chose to only keep one such setting (for now...).
 
 ## To-Do
 
@@ -82,7 +115,6 @@ Features:
  * Support seek
 
 Improvements:
- * More example code
  * Glossary, and check for inconsistent nomenclature (entry vs. extent for instance)
 
 Testing:
