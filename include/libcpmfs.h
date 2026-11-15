@@ -55,11 +55,13 @@ enum cpm_fs_mode {
 };
 
 enum cpm_fs_fill_order {
-	/* Standard CP/M disk layout (CHS).
-	 * Fill cylinders on each head before increasing the cylinder number. */
+	/* The most common CP/M disk layout (CHS).
+	 * Fill cylinders on each head before increasing the cylinder number.
+	 * Equivalent to ORDER SIDES on 22DISK (from Sydex). */
 	CPM_FILL_NORMAL = 0,
 	/* Side-by-side layout (HCS).
-	 * Sides are filled cylinder-by-cylinder before going to the next one.*/
+	 * Sides are filled cylinder-by-cylinder before going to the next one.
+	 * Equivalent to ORDER CYLINDERS on 22DISK (from Sydex). */
 	CPM_FILL_HCS = 1,
 };
 
@@ -223,6 +225,7 @@ enum cpm_fs_status cpm_fs_destroy_crawler(struct cpm_fs *fs,
 /* Replace every unused block contents with 0xE5 */
 enum cpm_fs_status cpm_fs_wipe_unused_sectors(struct cpm_fs *fs);
 
+enum cpm_fs_status cpm_fs_dump_superblock(struct cpm_fs *fs);
 #ifdef __cplusplus
 }
 #endif

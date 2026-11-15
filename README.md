@@ -30,7 +30,7 @@ of disk you're trying to read:
   * Block size: size of logical blocks. Cannot be smaller than a sector
   * Maximum directory entries: how many entries can fit on the disk
 * Reserved cylinders (usually occupied by CP/M)
-* Skew/Interleave: 
+* Skew/Interleave:
   * Skew Table: list of real sector numbers based on their position from index
   * Skew Factor: how many sectors between 2 consecutive numbers
     Skew table and factor are mutually exclusive
@@ -108,14 +108,21 @@ require any skew factor when addressing the sector by their number.
 22disk solves that issue by inputting both the skew factor and the physical
 sector order, but I chose to only keep one such setting (for now...).
 
+**Note**: I am not yet satisfied by this method and might change it to a more
+explicit format where both the sector header numbers and translation table are
+specified. The current approach makes it tedious to write disk definitions, and
+will probably not fit some odd machines.
+
+
 ## To-Do
 
 Features:
- * OS version for different FS attributes. Only 2.x is supported now.
- * Support seek
+ * Support OS version for different FS attributes. Only 2.x is supported now.
+ * Add seek operation for opened files.
 
 Improvements:
- * Glossary, and check for inconsistent nomenclature (entry vs. extent for instance)
+ * Glossary, and check for inconsistent nomenclature (entry VS. extent,
+   skew VS. interleave etc.)
 
 Testing:
  * Check for endianness bugs depending on the host endian.
@@ -127,11 +134,14 @@ Testing:
 
 Books:
 * CP/M 2.0 manual. [PDF](http://www.cpm.z80.de/manuals/SC-CPM.pdf)
-* Mastering CP/M by Alan R. Miller. [PDF](https://oldcomputers.dyndns.org/public/pub/manuals/mastering_cpm.pdf)
+* Mastering CP/M by Alan R. Miller.
+  [PDF](https://oldcomputers.dyndns.org/public/pub/manuals/mastering_cpm.pdf)
 
 Websites:
 * [Seasip - John Elliott's website](https://www.seasip.info/Cpm/index.html)
 * [DPB/DPH - sharpmz.org (mirror)](https://www.idealine.info/sharpmz/dpb.htm)
 
 Software:
-* [cpmtools 2.23](https://www.moria.de/~michael/cpmtools/), especially the manual pages
+* [Michael Hardt - cpmtools 2.23](https://www.moria.de/~michael/cpmtools/),
+  especially the manual pages
+* [Sydex - 22DISK Manual](www.bitsavers.org/pdf/sydex/22Disk_1.34_Sep90.pdf)
