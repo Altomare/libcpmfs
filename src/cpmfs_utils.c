@@ -356,7 +356,8 @@ void block_to_chs(struct cpm_fs *fs,
 	*s = (sector % fs->attr.sector_count);
 
 	if (fs->attr.fill_order == CPM_FILL_HCS) {
-		*h = (sector / fs->attr.sector_count) / fs->attr.cylinders;
+		*h = (sector / fs->attr.sector_count) + fs->attr.boot_cylinders;
+		*h = *h / fs->attr.cylinders;
 		*c = *c % fs->attr.cylinders;
 	} else {
 		*h = *c % fs->attr.heads;
